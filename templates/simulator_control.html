@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>iOS Simulator Remote Control</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .simulator-list {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .simulator-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .simulator-screen {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .screen-container {
+            position: relative;
+            display: inline-block;
+            border: 2px solid #333;
+            border-radius: 20px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .simulator-frame {
+            max-width: 400px;
+            height: auto;
+            display: block;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #0051D5;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🎮 iOS Simulator Remote Control</h1>
+
+        <div class="simulator-list">
+            <h2>Active Simulators</h2>
+            <div id="sessionsList"></div>
+            <button onclick="refreshSessions()">🔄 Refresh Sessions</button>
+        </div>
+
+        <div class="simulator-screen">
+            <h2>Simulator Screen</h2>
+            <div id="status" class="status disconnected">Not connected</div>
+
+            <div class="screen-container" id="screenContainer" onclick="handleScreenClick(event)">
+                <img id="simulatorFrame" class="simulator-frame" src="" alt="No stream active" />
+            </div>
+
+            <div class="controls">
+                <button onclick="homeButton()">🏠 Home</button>
+                <button onclick="lockButton()">🔒 Lock</button>
+                <button onclick="screenshotButton()">📸 Screenshot</button>
+                <button onclick="rotateButton()">🔄 Rotate</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentSessionId = null;
+        let streaming = false;
+
+        // Socket event handlers
+        socket.on('connect', function () {
+            document.getElementById('status').className = 'status connected';
+            document.getElementById('status').textContent = 'Connected to server';
+            refreshSessions();
+        });
+
+        socket.on('disconnect', function () {
+            document.getElementById('status').className = 'status disconnected';
+            document.getElementById('status').textContent = 'Disconnected from server';
+        });
+
+        socket.on('stream_started', function (data) {
+            document.getElementById('status').textContent = `✅ Streaming session: ${data.session_id.substring(0, 8)}`;
+            streaming = true;
+        });
+
+        // Handle frame updates (you'll need to implement WebRTC or WebSocket streaming)
+        socket.on('frame_update', function (data) {
+            if (data.session_id === currentSessionId) {
+                document.getElementById('simulatorFrame').src = 'data:image/jpeg;base64,' + data.frame;
+            }
+        });
+
+        // Functions
+        async function refreshSessions() {
+            try {
+                const response = await fetch('/sessions');
+                const sessions = await response.json();
+                displaySessions(sessions);
+            } catch (error) {
+                console.error('Error fetching sessions:', error);
+            }
+        }
+
+        function displaySessions(sessions) {
+            const container = document.getElementById('sessionsList');
+            container.innerHTML = '';
+
+            sessions.forEach(session => {
+                const item = document.createElement('div');
+                item.className = 'simulator-item';
+                item.innerHTML = `
+                    <div>
+                        <strong>${session.device_type}</strong> (iOS ${session.ios_version})<br>
+                        <small>Session: ${session.session_id.substring(0, 8)}... | Uptime: ${Math.round(session.uptime / 60)}m</small>
+                    </div>
+                    <button onclick="startStreaming('${session.session_id}')">📺 Stream</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        async function startStreaming(sessionId) {
+            currentSessionId = sessionId;
+
+            try {
+                // First, start streaming via REST API
+                const response = await fetch(`/start_stream/${sessionId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('status').textContent = `Starting stream for session: ${sessionId.substring(0, 8)}...`;
+
+                    // Then emit to socket.io
+                    socket.emit('start_stream', { session_id: sessionId });
+
+                    // Wait a moment for streaming to initialize
+                    setTimeout(() => {
+                        startFramePolling(sessionId);
+                    }, 1000);
+                } else {
+                    console.error('Failed to start streaming:', result);
+                }
+            } catch (error) {
+                console.error('Error starting stream:', error);
+            }
+        }
+
+        function startFramePolling(sessionId) {
+            if (window.frameInterval) {
+                clearInterval(window.frameInterval);
+            }
+
+            window.frameInterval = setInterval(async () => {
+                if (!streaming || currentSessionId !== sessionId) {
+                    clearInterval(window.frameInterval);
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/frame/${sessionId}`);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const url = URL.createObjectURL(blob);
+                        const img = document.getElementById('simulatorFrame');
+
+                        // Clean up previous URL to prevent memory leaks
+                        if (img.src && img.src.startsWith('blob:')) {
+                            URL.revokeObjectURL(img.src);
+                        }
+
+                        img.src = url;
+                        img.alt = `Simulator ${sessionId.substring(0, 8)}`;
+                    } else if (response.status === 404) {
+                        console.log('Stream not ready yet, retrying...');
+                    } else {
+                        console.error('Frame fetch error:', response.status, response.statusText);
+                    }
+                } catch (error) {
+                    console.error('Error fetching frame:', error);
+                }
+            }, 1000 / 10); // Start with 10 FPS, not 30 to reduce load
+        }
+
+        function handleScreenClick(event) {
+            if (!currentSessionId || !streaming) return;
+
+            const rect = event.target.getBoundingClientRect();
+            const x = Math.round((event.clientX - rect.left) * (event.target.naturalWidth / rect.width));
+            const y = Math.round((event.clientY - rect.top) * (event.target.naturalHeight / rect.height));
+
+            socket.emit('touch_event', {
+                session_id: currentSessionId,
+                x: x,
+                y: y,
+                type: 'tap'
+            });
+        }
+
+        async function homeButton() {
+            if (!currentSessionId) return;
+
+            try {
+                await fetch('/device_action/' + currentSessionId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'home' })
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function lockButton() {
+            if (!currentSessionId) return;
+
+            try {
+                await fetch('/device_action/' + currentSessionId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'lock' })
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function screenshotButton() {
+            if (!currentSessionId) return;
+
+            try {
+                const response = await fetch('/screenshot/' + currentSessionId);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `simulator_screenshot_${Date.now()}.png`;
+                    a.click();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function rotateButton() {
+            if (!currentSessionId) return;
+
+            try {
+                await fetch('/device_action/' + currentSessionId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'rotate' })
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,42 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>iOS Device Control</title>
+    <style>
+        #screen { border: 1px solid #888; cursor: pointer; max-width: 400px; }
+        #status { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>iOS Device Control</h1>
+    <div id="status">Connecting...</div>
+    <img id="screen" alt="Device screen" />
+    
+    <script>
+        const ws = new WebSocket('ws://localhost:8765');
+        const screen = document.getElementById('screen');
+        const status = document.getElementById('status');
+        
+        ws.onopen = () => {
+            status.textContent = 'Connected';
+        };
+        
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'screenshot') {
+                screen.src = 'data:image/png;base64,' + data.data;
+            }
+        };
+        
+        screen.onclick = (ev) => {
+            const rect = screen.getBoundingClientRect();
+            const x = Math.round((ev.clientX - rect.left) * (screen.naturalWidth / rect.width));
+            const y = Math.round((ev.clientY - rect.top) * (screen.naturalHeight / rect.height));
+            
+            ws.send(JSON.stringify({t: 'tap', x: x, y: y}));
+            status.textContent = `Tapped: (${x}, ${y})`;
+        };
+    </script>
+</body>
+</html>

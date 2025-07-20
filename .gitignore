@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+venv/
+dist/
+*.ipa
+*.apk
+*.log

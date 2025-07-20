@@ -1,0 +1,891 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>iOS Simulator Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+            overflow-x: auto;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            min-height: 100vh;
+            align-items: flex-start;
+        }
+
+        .simulator-section {
+            flex-shrink: 0;
+            min-width: 400px;
+            max-width: 500px;
+        }
+
+        .controls-panel {
+            flex: 1;
+            min-width: 400px;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #container {
+            position: relative;
+            display: inline-block;
+            background: white;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #screen {
+            border: 2px solid #888;
+            cursor: crosshair;
+            background: #f0f0f0;
+            border-radius: 8px;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: optimize-contrast;
+            image-rendering: crisp-edges;
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+            display: block;
+        }
+
+        #status {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            word-wrap: break-word;
+            line-height: 1.3;
+        }
+
+        .connected {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+
+        .disconnected {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+
+        .controls-section {
+            margin: 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .controls-section h3 {
+            margin: 0 0 12px 0;
+            color: #333;
+            font-size: 16px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+        }
+
+        .controls-grid-wide {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+        }
+
+        button {
+            margin: 0;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            background-color: #004085;
+            transform: translateY(0);
+        }
+
+        .mode-toggle button {
+            background-color: #28a745;
+        }
+
+        .mode-toggle button:hover {
+            background-color: #1e7e34;
+        }
+
+        .hardware-buttons button {
+            background-color: #6c757d;
+        }
+
+        .hardware-buttons button:hover {
+            background-color: #545b62;
+        }
+
+        .gesture-buttons button {
+            background-color: #17a2b8;
+        }
+
+        .gesture-buttons button:hover {
+            background-color: #117a8b;
+        }
+
+        .text-input-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .text-input-section input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+            min-width: 200px;
+            font-size: 14px;
+        }
+
+        .text-input-section button {
+            flex-shrink: 0;
+        }
+
+        .swipe-mode {
+            background-color: #ffc107 !important;
+            color: #000 !important;
+        }
+
+        .swipe-mode:hover {
+            background-color: #e0a800 !important;
+        }
+
+        .system-controls .controls-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        /* Responsive design */
+        @media (max-width: 1200px) {
+            .main-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .simulator-section {
+                max-width: 100%;
+                width: 100%;
+            }
+            
+            .controls-panel {
+                max-width: 100%;
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                margin: 10px;
+            }
+            
+            .controls-grid {
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            }
+            
+            .controls-grid-wide {
+                grid-template-columns: 1fr;
+            }
+            
+            button {
+                font-size: 12px;
+                padding: 8px 10px;
+            }
+        }
+
+        .title-section {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .title-section h1 {
+            margin: 0;
+            color: #333;
+            font-size: 24px;
+        }
+
+        .simulator-info {
+            font-size: 11px;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="title-section">
+        <h1>🎮 iOS Simulator Control - Full Remote</h1>
+    </div>
+
+    <div class="main-container">
+        <!-- Simulator Section -->
+        <div class="simulator-section">
+            <div id="status" class="disconnected">Connecting...</div>
+            
+            <div id="container">
+                <canvas id="screen" width="400" height="600"></canvas>
+                <div class="simulator-info">
+                    <div id="dimensionInfo">Loading simulator dimensions...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <div class="controls-section">
+                <h3>📱 Stream Mode</h3>
+                <div class="mode-toggle controls-grid">
+                    <button onclick="switchMode('video')">🎥 Video Mode</button>
+                    <button onclick="switchMode('screenshot')">📷 Screenshot Mode</button>
+                </div>
+            </div>
+
+            <div class="controls-section system-controls">
+                <h3>🎮 System Controls</h3>
+                <div class="controls-grid">
+                    <button onclick="restartPipeline()">🔄 Restart</button>
+                    <button onclick="checkStatus()">📊 Status</button>
+                    <button onclick="takeScreenshot()">🔄 Refresh</button>
+                    <button onclick="testTap()">🎯 Test Tap</button>
+                </div>
+            </div>
+
+            <div class="controls-section hardware-buttons">
+                <h3>🔘 Hardware Buttons</h3>
+                <div class="controls-grid">
+                    <button onclick="pressButton('home')">🏠 Home</button>
+                    <button onclick="pressButton('lock')">🔒 Lock</button>
+                    <button onclick="pressButton('siri')">🎤 Siri</button>
+                    <button onclick="pressButton('side-button')">📱 Side</button>
+                    <button onclick="pressButton('apple-pay')">💳 Pay</button>
+                    <button onclick="pressVolumeButton('up')">🔊 Vol+</button>
+                    <button onclick="pressVolumeButton('down')">🔉 Vol-</button>
+                    <button onclick="pressShakeButton()">📳 Shake</button>
+                </div>
+            </div>
+
+            <div class="controls-section gesture-buttons">
+                <h3>👆 Gesture Controls</h3>
+                <div class="controls-grid-wide">
+                    <button id="swipeToggle" onclick="toggleSwipeMode()">✋ Enable Swipe Mode</button>
+                </div>
+                <div class="controls-grid">
+                    <button onclick="quickSwipe('up')">⬆️ Up</button>
+                    <button onclick="quickSwipe('down')">⬇️ Down</button>
+                    <button onclick="quickSwipe('left')">⬅️ Left</button>
+                    <button onclick="quickSwipe('right')">➡️ Right</button>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>⌨️ Text Input</h3>
+                <div class="text-input-section">
+                    <input type="text" id="textInput" placeholder="Enter text to type..." maxlength="200">
+                    <button onclick="sendText()">📤 Send</button>
+                    <button onclick="clearText()">🗑️ Clear</button>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>⌨️ Keyboard Shortcuts</h3>
+                <div style="font-size: 11px; color: #666; line-height: 1.4;">
+                    <strong>H</strong>=Home, <strong>L</strong>=Lock, <strong>S</strong>=Siri, <strong>P</strong>=Pay<br>
+                    <strong>+/-</strong>=Volume, <strong>K</strong>=Shake, <strong>Space</strong>=Toggle Swipe<br>
+                    <strong>Arrow Keys</strong>=Quick Swipes, <strong>Enter</strong>=Send Text
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('screen');
+        const ctx = canvas.getContext('2d');
+        const status = document.getElementById('status');
+        const textInput = document.getElementById('textInput');
+        const swipeToggle = document.getElementById('swipeToggle');
+        const dimensionInfo = document.getElementById('dimensionInfo');
+
+        let currentMode = 'video';
+        let videoWs = null;
+        let screenshotWs = null;
+        let controlWs = null;
+
+        // Gesture mode
+        let swipeMode = false;
+        let swipeStart = null;
+
+        // Performance tracking
+        let frameCount = 0;
+        let lastFrameTime = 0;
+        let fpsHistory = [];
+        let performanceStats = {
+            averageFps: 0,
+            frameDrops: 0,
+            lastUpdate: 0
+        };
+
+        // Coordinate systems
+        let pixelWidth = 0, pixelHeight = 0;    // For display
+        let pointWidth = 0, pointHeight = 0;    // For taps
+
+        init();
+
+        function init() {
+            setupControlWebSocket();
+            setupKeyboardShortcuts();
+            switchMode('video');
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                if (e.target === textInput) return; // Don't interfere with text input
+
+                switch (e.key) {
+                    case 'h': pressButton('home'); break;
+                    case 'l': pressButton('lock'); break;
+                    case 's': pressButton('siri'); break;
+                    case 'p': pressButton('apple-pay'); break;
+                    case '=': case '+': pressVolumeButton('up'); break;
+                    case '-': case '_': pressVolumeButton('down'); break;
+                    case 'k': pressShakeButton(); break;
+                    case 'ArrowUp': e.preventDefault(); quickSwipe('up'); break;
+                    case 'ArrowDown': e.preventDefault(); quickSwipe('down'); break;
+                    case 'ArrowLeft': e.preventDefault(); quickSwipe('left'); break;
+                    case 'ArrowRight': e.preventDefault(); quickSwipe('right'); break;
+                    case ' ': e.preventDefault(); toggleSwipeMode(); break;
+                }
+            });
+
+            // Handle text input with Enter key
+            textInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendText();
+                }
+            });
+        }
+
+        function setupControlWebSocket() {
+            controlWs = new WebSocket(`ws://${location.hostname}:8000/ws/control`);
+            controlWs.onopen = () => console.log('Control WebSocket connected');
+            controlWs.onerror = (error) => console.error('Control WebSocket error:', error);
+            controlWs.onclose = () => {
+                console.log('Control WebSocket disconnected, reconnecting...');
+                setTimeout(setupControlWebSocket, 2000);
+            };
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            if (videoWs) videoWs.close();
+            if (screenshotWs) screenshotWs.close();
+
+            if (mode === 'video') {
+                setupHighPerformanceVideoStream();
+            } else {
+                setupScreenshotMode();
+            }
+        }
+
+        function setupHighPerformanceVideoStream() {
+            videoWs = new WebSocket(`ws://${location.hostname}:8000/ws/video`);
+
+            videoWs.onopen = () => {
+                console.log('High-performance video WebSocket connected');
+                status.textContent = 'High-performance video stream connecting...';
+                status.className = 'connected';
+                frameCount = 0;
+                lastFrameTime = performance.now();
+            };
+
+            videoWs.onclose = () => {
+                status.textContent = 'Video stream disconnected';
+                status.className = 'disconnected';
+            };
+
+            videoWs.onmessage = (event) => {
+                const now = performance.now();
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'video_frame') {
+                    frameCount++;
+
+                    const frameDelta = now - lastFrameTime;
+                    if (frameDelta > 0) {
+                        const instantFps = 1000 / frameDelta;
+                        fpsHistory.push(instantFps);
+                        if (fpsHistory.length > 20) fpsHistory.shift();
+
+                        performanceStats.averageFps = Math.round(
+                            fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length
+                        );
+                    }
+                    lastFrameTime = now;
+
+                    const img = new Image();
+                    img.onload = () => {
+                        pixelWidth = data.pixel_width || data.width || img.width;
+                        pixelHeight = data.pixel_height || data.height || img.height;
+                        pointWidth = data.point_width || 390;
+                        pointHeight = data.point_height || 844;
+
+                        // Calculate display size based on container width (responsive)
+                        const containerWidth = canvas.parentElement.clientWidth - 24; // Account for padding
+                        const devicePixelRatio = window.devicePixelRatio || 1;
+                        const aspectRatio = pixelWidth / pixelHeight;
+                        
+                        // Calculate optimal display dimensions
+                        let displayWidth = Math.min(containerWidth, 450); // Max width constraint
+                        let displayHeight = displayWidth / aspectRatio;
+                        
+                        // Ensure height doesn't exceed viewport
+                        const maxHeight = window.innerHeight * 0.7;
+                        if (displayHeight > maxHeight) {
+                            displayHeight = maxHeight;
+                            displayWidth = displayHeight * aspectRatio;
+                        }
+
+                        displayWidth = Math.round(displayWidth);
+                        displayHeight = Math.round(displayHeight);
+
+                        // Set canvas internal resolution for high quality
+                        canvas.width = displayWidth * devicePixelRatio;
+                        canvas.height = displayHeight * devicePixelRatio;
+                        
+                        // Set display size
+                        canvas.style.width = displayWidth + 'px';
+                        canvas.style.height = displayHeight + 'px';
+
+                        ctx.scale(devicePixelRatio, devicePixelRatio);
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.clearRect(0, 0, displayWidth, displayHeight);
+                        ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+
+                        // Update dimension info
+                        dimensionInfo.textContent = `Pixels: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Display: ${displayWidth}×${displayHeight}`;
+
+                        if (frameCount % 30 === 0 || now - performanceStats.lastUpdate > 1000) {
+                            const serverFps = data.fps || 0;
+                            const modeText = swipeMode ? '✋ SWIPE MODE' : '👆 TAP MODE';
+                            status.textContent = `${modeText} | Frame: ${frameCount}, Client FPS: ${performanceStats.averageFps}, Server FPS: ${serverFps}`;
+                            performanceStats.lastUpdate = now;
+                        }
+                    };
+
+                    img.src = 'data:image/png;base64,' + data.data;
+                }
+            };
+
+            videoWs.onerror = (error) => {
+                console.error('Video WebSocket error:', error);
+                status.textContent = 'Video stream error';
+                status.className = 'disconnected';
+            };
+        }
+
+        function setupScreenshotMode() {
+            screenshotWs = new WebSocket(`ws://${location.hostname}:8000/ws/screenshot`);
+
+            screenshotWs.onopen = () => {
+                console.log('Screenshot WebSocket connected');
+                status.textContent = 'High-quality screenshot mode connected';
+                status.className = 'connected';
+            };
+
+            screenshotWs.onclose = () => {
+                status.textContent = 'Screenshot mode disconnected';
+                status.className = 'disconnected';
+            };
+
+            screenshotWs.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'screenshot') {
+                    const img = new Image();
+                    img.onload = () => {
+                        pixelWidth = data.pixel_width || data.width || img.width;
+                        pixelHeight = data.pixel_height || data.height || img.height;
+                        pointWidth = data.point_width || 390;
+                        pointHeight = data.point_height || 844;
+
+                        // Use same responsive sizing logic as video mode
+                        const containerWidth = canvas.parentElement.clientWidth - 24;
+                        const devicePixelRatio = window.devicePixelRatio || 1;
+                        const aspectRatio = pixelWidth / pixelHeight;
+                        
+                        let displayWidth = Math.min(containerWidth, 450);
+                        let displayHeight = displayWidth / aspectRatio;
+                        
+                        const maxHeight = window.innerHeight * 0.7;
+                        if (displayHeight > maxHeight) {
+                            displayHeight = maxHeight;
+                            displayWidth = displayHeight * aspectRatio;
+                        }
+
+                        displayWidth = Math.round(displayWidth);
+                        displayHeight = Math.round(displayHeight);
+
+                        canvas.width = displayWidth * devicePixelRatio;
+                        canvas.height = displayHeight * devicePixelRatio;
+                        canvas.style.width = displayWidth + 'px';
+                        canvas.style.height = displayHeight + 'px';
+
+                        ctx.scale(devicePixelRatio, devicePixelRatio);
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.clearRect(0, 0, displayWidth, displayHeight);
+                        ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+
+                        dimensionInfo.textContent = `Pixels: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Display: ${displayWidth}×${displayHeight}`;
+
+                        const modeText = swipeMode ? '✋ SWIPE MODE' : '👆 TAP MODE';
+                        status.textContent = `${modeText} | High-quality screenshot | DPR: ${devicePixelRatio}`;
+                    };
+                    img.src = 'data:image/png;base64,' + data.data;
+                }
+            };
+        }
+
+        // Enhanced click/swipe handler (coordinate mapping preserved)
+        canvas.onmousedown = (ev) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = ev.clientX - rect.left;
+            const clickY = ev.clientY - rect.top;
+
+            if (swipeMode) {
+                swipeStart = { x: clickX, y: clickY };
+                canvas.style.cursor = 'grab';
+            } else {
+                handleTap(clickX, clickY);
+            }
+        };
+
+        canvas.onmouseup = (ev) => {
+            if (swipeMode && swipeStart) {
+                const rect = canvas.getBoundingClientRect();
+                const endX = ev.clientX - rect.left;
+                const endY = ev.clientY - rect.top;
+
+                handleSwipe(swipeStart.x, swipeStart.y, endX, endY);
+                swipeStart = null;
+                canvas.style.cursor = 'crosshair';
+            }
+        };
+
+        canvas.onmouseleave = () => {
+            if (swipeMode) {
+                swipeStart = null;
+                canvas.style.cursor = 'crosshair';
+            }
+        };
+
+        function handleTap(clickX, clickY) {
+            if (pointWidth > 0 && pointHeight > 0) {
+                const displayWidth = parseInt(canvas.style.width);
+                const displayHeight = parseInt(canvas.style.height);
+
+                const tapX = Math.round((clickX / displayWidth) * pointWidth);
+                const tapY = Math.round((clickY / displayHeight) * pointHeight);
+
+                console.log(`Tap: Display(${Math.round(clickX)}, ${Math.round(clickY)}) -> Point(${tapX}, ${tapY})`);
+
+                if (currentMode === 'screenshot' && screenshotWs) {
+                    screenshotWs.send(JSON.stringify({ t: 'tap', x: tapX, y: tapY }));
+                } else if (currentMode === 'video' && controlWs) {
+                    controlWs.send(JSON.stringify({ t: 'tap', x: tapX, y: tapY }));
+                }
+
+                showTemporaryStatus(`Tapped: (${tapX}, ${tapY})`);
+            }
+        }
+
+        function handleSwipe(startX, startY, endX, endY) {
+            if (pointWidth > 0 && pointHeight > 0) {
+                const displayWidth = parseInt(canvas.style.width);
+                const displayHeight = parseInt(canvas.style.height);
+
+                const startPointX = Math.round((startX / displayWidth) * pointWidth);
+                const startPointY = Math.round((startY / displayHeight) * pointHeight);
+                const endPointX = Math.round((endX / displayWidth) * pointWidth);
+                const endPointY = Math.round((endY / displayHeight) * pointHeight);
+
+                console.log(`Swipe: Point(${startPointX}, ${startPointY}) -> Point(${endPointX}, ${endPointY})`);
+
+                const swipeData = {
+                    t: 'swipe',
+                    start_x: startPointX,
+                    start_y: startPointY,
+                    end_x: endPointX,
+                    end_y: endPointY,
+                    duration: 0.3
+                };
+
+                if (currentMode === 'screenshot' && screenshotWs) {
+                    screenshotWs.send(JSON.stringify(swipeData));
+                } else if (currentMode === 'video' && controlWs) {
+                    controlWs.send(JSON.stringify(swipeData));
+                }
+
+                showTemporaryStatus(`Swiped: (${startPointX}, ${startPointY}) → (${endPointX}, ${endPointY})`);
+            }
+        }
+
+        function toggleSwipeMode() {
+            swipeMode = !swipeMode;
+            if (swipeMode) {
+                swipeToggle.textContent = '👆 Disable Swipe Mode';
+                swipeToggle.className = 'swipe-mode';
+                canvas.style.cursor = 'crosshair';
+            } else {
+                swipeToggle.textContent = '✋ Enable Swipe Mode';
+                swipeToggle.className = '';
+                canvas.style.cursor = 'crosshair';
+            }
+
+            const modeText = swipeMode ? '✋ SWIPE MODE ENABLED' : '👆 TAP MODE ENABLED';
+            showTemporaryStatus(modeText);
+        }
+
+        function quickSwipe(direction) {
+            if (pointWidth === 0 || pointHeight === 0) return;
+
+            const centerX = Math.round(pointWidth / 2);
+            const centerY = Math.round(pointHeight / 2);
+            const distance = 200;
+
+            let startX, startY, endX, endY;
+
+            switch (direction) {
+                case 'up':
+                    startX = centerX; startY = centerY + distance;
+                    endX = centerX; endY = centerY - distance;
+                    break;
+                case 'down':
+                    startX = centerX; startY = centerY - distance;
+                    endX = centerX; endY = centerY + distance;
+                    break;
+                case 'left':
+                    startX = centerX + distance; startY = centerY;
+                    endX = centerX - distance; endY = centerY;
+                    break;
+                case 'right':
+                    startX = centerX - distance; startY = centerY;
+                    endX = centerX + distance; endY = centerY;
+                    break;
+            }
+
+            const swipeData = {
+                t: 'swipe',
+                start_x: startX,
+                start_y: startY,
+                end_x: endX,
+                end_y: endY,
+                duration: 0.3
+            };
+
+            if (currentMode === 'video' && controlWs) {
+                controlWs.send(JSON.stringify(swipeData));
+            }
+
+            showTemporaryStatus(`Quick swipe ${direction} performed`);
+        }
+
+        function pressButton(button) {
+            if (currentMode === 'video' && controlWs) {
+                controlWs.send(JSON.stringify({ t: 'button', button: button }));
+            }
+
+            showTemporaryStatus(`${button} button pressed`);
+        }
+
+        function sendText() {
+            const text = textInput.value.trim();
+            if (!text) return;
+
+            if (currentMode === 'video' && controlWs) {
+                controlWs.send(JSON.stringify({ t: 'text', text: text }));
+            }
+
+            showTemporaryStatus(`Text sent: "${text}"`);
+            textInput.value = '';
+        }
+
+        function clearText() {
+            textInput.value = '';
+        }
+
+        function showTemporaryStatus(message) {
+            const oldText = status.textContent;
+            status.textContent = message;
+            setTimeout(() => {
+                if (status.textContent === message) {
+                    status.textContent = oldText;
+                }
+            }, 2000);
+        }
+
+        async function takeScreenshot() {
+            if (currentMode === 'screenshot' && screenshotWs) {
+                screenshotWs.send(JSON.stringify({ t: 'refresh' }));
+            }
+        }
+
+        async function restartPipeline() {
+            status.textContent = 'Restarting stream...';
+            status.className = 'disconnected';
+            setTimeout(() => switchMode(currentMode), 1000);
+        }
+
+        async function checkStatus() {
+            try {
+                const resp = await fetch('/status');
+                const statusData = await resp.json();
+
+                if (statusData.status === 'healthy') {
+                    status.textContent = `System healthy | Video clients: ${statusData.video_clients} | Cache age: ${statusData.cache_age?.toFixed(2)}s`;
+                    status.className = 'connected';
+                } else {
+                    status.textContent = 'System unhealthy';
+                    status.className = 'disconnected';
+                }
+            } catch (error) {
+                status.textContent = 'Status check failed';
+                status.className = 'disconnected';
+            }
+        }
+
+        async function testTap() {
+            if (pointWidth === 0 || pointHeight === 0) {
+                status.textContent = 'No point dimensions available';
+                return;
+            }
+
+            const centerX = Math.round(pointWidth / 2);
+            const centerY = Math.round(pointHeight / 2);
+
+            try {
+                const resp = await fetch(`/debug/tap/${centerX}/${centerY}`);
+                const result = await resp.json();
+
+                if (result.success) {
+                    showTemporaryStatus(`Test tap successful at (${centerX}, ${centerY})`);
+                } else {
+                    showTemporaryStatus(`Test tap failed: ${result.stderr}`);
+                }
+            } catch (error) {
+                showTemporaryStatus('Test tap failed');
+            }
+        }
+
+        async function pressVolumeButton(direction) {
+            try {
+                const resp = await fetch(`/debug/volume-${direction}`);
+                const result = await resp.json();
+
+                if (result.success) {
+                    showTemporaryStatus(`Volume ${direction} pressed`);
+                } else {
+                    showTemporaryStatus(`Volume ${direction} failed: ${result.note || result.stderr}`);
+                }
+            } catch (error) {
+                showTemporaryStatus(`Volume ${direction} failed`);
+            }
+        }
+
+        async function pressShakeButton() {
+            try {
+                const resp = await fetch('/debug/shake');
+                const result = await resp.json();
+
+                if (result.success) {
+                    showTemporaryStatus('Device shaken');
+                } else {
+                    showTemporaryStatus(`Shake failed: ${result.stderr}`);
+                }
+            } catch (error) {
+                showTemporaryStatus('Shake failed');
+            }
+        }
+
+        // Handle window resize to maintain aspect ratio
+        window.addEventListener('resize', () => {
+            if (currentMode === 'video' && pixelWidth > 0) {
+                // Trigger a resize recalculation
+                setTimeout(() => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const containerWidth = canvas.parentElement.clientWidth - 24;
+                        const devicePixelRatio = window.devicePixelRatio || 1;
+                        const aspectRatio = pixelWidth / pixelHeight;
+                        
+                        let displayWidth = Math.min(containerWidth, 450);
+                        let displayHeight = displayWidth / aspectRatio;
+                        
+                        const maxHeight = window.innerHeight * 0.7;
+                        if (displayHeight > maxHeight) {
+                            displayHeight = maxHeight;
+                            displayWidth = displayHeight * aspectRatio;
+                        }
+
+                        displayWidth = Math.round(displayWidth);
+                        displayHeight = Math.round(displayHeight);
+
+                        canvas.width = displayWidth * devicePixelRatio;
+                        canvas.height = displayHeight * devicePixelRatio;
+                        canvas.style.width = displayWidth + 'px';
+                        canvas.style.height = displayHeight + 'px';
+
+                        ctx.scale(devicePixelRatio, devicePixelRatio);
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.clearRect(0, 0, displayWidth, displayHeight);
+                        ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+
+                        dimensionInfo.textContent = `Pixels: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Display: ${displayWidth}×${displayHeight}`;
+                    };
+                    img.src = canvas.toDataURL();
+                }, 100);
+            }
+        });
+    </script>
+</body>
+
+</html>
