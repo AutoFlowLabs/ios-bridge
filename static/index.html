@@ -196,12 +196,12 @@
                 flex-direction: column;
                 align-items: center;
             }
-            
+
             .simulator-section {
                 max-width: 100%;
                 width: 100%;
             }
-            
+
             .controls-panel {
                 max-width: 100%;
                 width: 100%;
@@ -212,15 +212,15 @@
             body {
                 margin: 10px;
             }
-            
+
             .controls-grid {
                 grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
             }
-            
+
             .controls-grid-wide {
                 grid-template-columns: 1fr;
             }
-            
+
             button {
                 font-size: 12px;
                 padding: 8px 10px;
@@ -260,7 +260,7 @@
         <!-- Simulator Section -->
         <div class="simulator-section">
             <div id="status" class="disconnected">Connecting...</div>
-            
+
             <div id="container">
                 <canvas id="screen" width="400" height="600"></canvas>
                 <div class="simulator-info">
@@ -328,7 +328,8 @@
             <div class="controls-section">
                 <h3>⌨️ Keyboard Shortcuts</h3>
                 <div style="font-size: 11px; color: #666; line-height: 1.4;">
-                    <strong>H</strong>=Home, <strong>L</strong>=Lock, <strong>S</strong>=Siri, <strong>P</strong>=Pay<br>
+                    <strong>H</strong>=Home, <strong>L</strong>=Lock, <strong>S</strong>=Siri,
+                    <strong>P</strong>=Pay<br>
                     <strong>+/-</strong>=Volume, <strong>K</strong>=Shake, <strong>Space</strong>=Toggle Swipe<br>
                     <strong>Arrow Keys</strong>=Quick Swipes, <strong>Enter</strong>=Send Text
                 </div>
@@ -471,11 +472,11 @@
                         const containerWidth = canvas.parentElement.clientWidth - 24; // Account for padding
                         const devicePixelRatio = window.devicePixelRatio || 1;
                         const aspectRatio = pixelWidth / pixelHeight;
-                        
+
                         // Calculate optimal display dimensions
                         let displayWidth = Math.min(containerWidth, 450); // Max width constraint
                         let displayHeight = displayWidth / aspectRatio;
-                        
+
                         // Ensure height doesn't exceed viewport
                         const maxHeight = window.innerHeight * 0.7;
                         if (displayHeight > maxHeight) {
@@ -489,7 +490,7 @@
                         // Set canvas internal resolution for high quality
                         canvas.width = displayWidth * devicePixelRatio;
                         canvas.height = displayHeight * devicePixelRatio;
-                        
+
                         // Set display size
                         canvas.style.width = displayWidth + 'px';
                         canvas.style.height = displayHeight + 'px';
@@ -501,7 +502,7 @@
                         ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
 
                         // Update dimension info
-                        dimensionInfo.textContent = `Pixels: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Display: ${displayWidth}×${displayHeight}`;
+                        dimensionInfo.textContent = `Pixels: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Display: ${displayWidth}×${displayHeight} | Format: ${data.format?.toUpperCase() || 'PNG'}`;
 
                         if (frameCount % 30 === 0 || now - performanceStats.lastUpdate > 1000) {
                             const serverFps = data.fps || 0;
@@ -511,7 +512,8 @@
                         }
                     };
 
-                    img.src = 'data:image/png;base64,' + data.data;
+                    const formatPrefix = data.format === 'jpeg' ? 'image/jpeg' : 'image/png';
+                    img.src = `data:${formatPrefix};base64,${data.data}`;
                 }
             };
 
@@ -550,10 +552,10 @@
                         const containerWidth = canvas.parentElement.clientWidth - 24;
                         const devicePixelRatio = window.devicePixelRatio || 1;
                         const aspectRatio = pixelWidth / pixelHeight;
-                        
+
                         let displayWidth = Math.min(containerWidth, 450);
                         let displayHeight = displayWidth / aspectRatio;
-                        
+
                         const maxHeight = window.innerHeight * 0.7;
                         if (displayHeight > maxHeight) {
                             displayHeight = maxHeight;
@@ -855,10 +857,10 @@
                         const containerWidth = canvas.parentElement.clientWidth - 24;
                         const devicePixelRatio = window.devicePixelRatio || 1;
                         const aspectRatio = pixelWidth / pixelHeight;
-                        
+
                         let displayWidth = Math.min(containerWidth, 450);
                         let displayHeight = displayWidth / aspectRatio;
-                        
+
                         const maxHeight = window.innerHeight * 0.7;
                         if (displayHeight > maxHeight) {
                             displayHeight = maxHeight;
