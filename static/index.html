@@ -45,7 +45,8 @@
             box-sizing: border-box;
         }
 
-        #screen {
+        #screen,
+        #webrtc-video {
             border: 2px solid #888;
             cursor: crosshair;
             background: #f0f0f0;
@@ -57,6 +58,14 @@
             height: auto;
             max-width: 100%;
             display: block;
+            object-fit: contain;
+            /* For video element */
+        }
+
+        #webrtc-video {
+            /* Ensure WebRTC video has same constraints as canvas */
+            max-height: 70vh;
+            aspect-ratio: auto;
         }
 
         #status {
@@ -141,6 +150,18 @@
             background-color: #1e7e34;
         }
 
+        /* Active mode button styling */
+        .mode-toggle button.active {
+            background-color: #007bff !important;
+            color: white !important;
+            box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+            transform: none !important;
+        }
+
+        .mode-toggle button.active:hover {
+            background-color: #0056b3 !important;
+        }
+
         .hardware-buttons button {
             background-color: #6c757d;
         }
@@ -188,6 +209,15 @@
 
         .system-controls .controls-grid {
             grid-template-columns: repeat(2, 1fr);
+        }
+
+        /* WebRTC Quality Section - Hidden by default */
+        #webrtc-quality-section {
+            display: none;
+        }
+
+        #webrtc-quality-section.visible {
+            display: block;
         }
 
         /* Responsive design */
@@ -299,9 +329,8 @@
 
             <div id="container">
                 <canvas id="screen" width="400" height="600"></canvas>
-                <!-- Add video element for WebRTC -->
-                <video id="webrtc-video" style="display: none; width: 100%; height: auto; border-radius: 8px;" autoplay
-                    playsinline muted></video>
+                <!-- WebRTC video with same constraints -->
+                <video id="webrtc-video" style="display: none;" autoplay playsinline muted></video>
                 <div class="simulator-info">
                     <div id="dimensionInfo">Loading simulator dimensions...</div>
                     <div class="stream-quality">
@@ -317,23 +346,24 @@
             <div class="controls-section">
                 <h3>📱 Stream Mode</h3>
                 <div class="mode-toggle controls-grid">
-                    <button onclick="switchMode('webrtc')">🚀 WebRTC Stream</button>
-                    <button onclick="switchMode('video')">🎥 WebSocket Stream</button>
-                    <button onclick="switchMode('screenshot')">📷 Screenshot Mode</button>
+                    <button id="webrtc-btn" onclick="switchMode('webrtc')">🚀 WebRTC Stream</button>
+                    <button id="video-btn" onclick="switchMode('video')" class="active">🎥 WebSocket Stream</button>
+                    <button id="screenshot-btn" onclick="switchMode('screenshot')">📷 Screenshot Mode</button>
                 </div>
             </div>
 
-             <div class="controls-section">
+            <!-- WebRTC Quality Section - Only visible in WebRTC mode -->
+            <div id="webrtc-quality-section" class="controls-section">
                 <h3>🎬 WebRTC Quality</h3>
                 <div class="mode-toggle controls-grid">
-                    <button onclick="setWebRTCQuality('medium')">📺 Medium</button>
-                    <button onclick="setWebRTCQuality('high')">🏆 High</button>
-                    <button onclick="setWebRTCQuality('ultra')">💎 Ultra</button>
+                    <button id="quality-medium-btn" onclick="setWebRTCQuality('medium')">📺 Medium</button>
+                    <button id="quality-high-btn" onclick="setWebRTCQuality('high')" class="active">🏆 High</button>
+                    <button id="quality-ultra-btn" onclick="setWebRTCQuality('ultra')">💎 Ultra</button>
                 </div>
                 <div style="font-size: 11px; color: #666; margin-top: 8px; text-align: center;">
                     Medium: 45fps/3Mbps | High: 60fps/5Mbps | Ultra: 60fps/8Mbps
                 </div>
-                </div>
+            </div>
 
             <div class="controls-section system-controls">
                 <h3>🎮 System Controls</h3>
@@ -364,6 +394,10 @@
                 <div class="controls-grid-wide">
                     <button id="swipeToggle" onclick="toggleSwipeMode()">✋ Enable Swipe Mode</button>
                 </div>
+
+                <!-- Add a line break for better spacing -->
+                <br>
+
                 <div class="controls-grid">
                     <button onclick="quickSwipe('up')">⬆️ Up</button>
                     <button onclick="quickSwipe('down')">⬇️ Down</button>
@@ -384,6 +418,7 @@
             <div class="controls-section">
                 <h3>⌨️ Keyboard Shortcuts</h3>
                 <div style="font-size: 11px; color: #666; line-height: 1.4;">
+                    <strong>W</strong>=WebRTC, <strong>V</strong>=Video, <strong>C</strong>=Screenshot<br>
                     <strong>H</strong>=Home, <strong>L</strong>=Lock, <strong>S</strong>=Siri,
                     <strong>P</strong>=Pay<br>
                     <strong>+/-</strong>=Volume, <strong>K</strong>=Shake, <strong>Space</strong>=Toggle Swipe<br>
@@ -403,6 +438,7 @@
         const qualityInfo = document.getElementById('qualityInfo');
         const latencyInfo = document.getElementById('latencyInfo');
         const webrtcVideo = document.getElementById('webrtc-video');
+        let currentWebRTCQuality = 'high';
 
 
         let currentMode = 'video';
@@ -453,6 +489,7 @@
             switchMode('video');
         }
 
+
         function setupKeyboardShortcuts() {
             document.addEventListener('keydown', (e) => {
                 if (e.target === textInput) return; // Don't interfere with text input
@@ -462,6 +499,7 @@
                     case 'v': switchMode('video'); break;
                     case 'c': switchMode('screenshot'); break;
 
+                    // These should work in ALL modes
                     case 'h': pressButton('home'); break;
                     case 'l': pressButton('lock'); break;
                     case 's': pressButton('siri'); break;
@@ -485,18 +523,42 @@
             });
         }
 
+
         function setupControlWebSocket() {
             controlWs = new WebSocket(`ws://${location.hostname}:8000/ws/control`);
-            controlWs.onopen = () => console.log('Control WebSocket connected');
-            controlWs.onerror = (error) => console.error('Control WebSocket error:', error);
+
+            controlWs.onopen = () => {
+                console.log('Control WebSocket connected');
+            };
+
+            controlWs.onerror = (error) => {
+                console.error('Control WebSocket error:', error);
+                showTemporaryStatus('Control connection error');
+            };
+
             controlWs.onclose = () => {
                 console.log('Control WebSocket disconnected, reconnecting...');
+                showTemporaryStatus('Control connection lost, reconnecting...');
                 setTimeout(setupControlWebSocket, 2000);
             };
         }
 
+
         function switchMode(mode) {
             currentMode = mode;
+
+            // Update button highlighting
+            updateModeButtonHighlight(mode);
+
+            // Show/hide WebRTC quality section
+            const webrtcQualitySection = document.getElementById('webrtc-quality-section');
+            if (mode === 'webrtc') {
+                webrtcQualitySection.classList.add('visible');
+                // Initialize WebRTC quality button highlighting
+                updateWebRTCQualityButtonHighlight(currentWebRTCQuality);
+            } else {
+                webrtcQualitySection.classList.remove('visible');
+            }
 
             // Clean up existing connections
             if (videoWs) videoWs.close();
@@ -520,6 +582,21 @@
             }
         }
 
+        function updateModeButtonHighlight(currentMode) {
+            // Remove active class from all mode buttons
+            document.getElementById('webrtc-btn').classList.remove('active');
+            document.getElementById('video-btn').classList.remove('active');
+            document.getElementById('screenshot-btn').classList.remove('active');
+
+            // Add active class to current mode button
+            if (currentMode === 'webrtc') {
+                document.getElementById('webrtc-btn').classList.add('active');
+            } else if (currentMode === 'video') {
+                document.getElementById('video-btn').classList.add('active');
+            } else if (currentMode === 'screenshot') {
+                document.getElementById('screenshot-btn').classList.add('active');
+            }
+        }
 
         function setupHighPerformanceVideoStream() {
             videoWs = new WebSocket(`ws://${location.hostname}:8000/ws/video`);
@@ -782,17 +859,22 @@
             if (swipeMode) {
                 swipeToggle.textContent = '👆 Disable Swipe Mode';
                 swipeToggle.className = 'swipe-mode';
+
+                // Update cursor for both canvas and video
                 canvas.style.cursor = 'crosshair';
+                webrtcVideo.style.cursor = 'crosshair';
             } else {
                 swipeToggle.textContent = '✋ Enable Swipe Mode';
                 swipeToggle.className = '';
+
+                // Update cursor for both canvas and video
                 canvas.style.cursor = 'crosshair';
+                webrtcVideo.style.cursor = 'crosshair';
             }
 
             const modeText = swipeMode ? '✋ SWIPE MODE ENABLED' : '👆 TAP MODE ENABLED';
             showTemporaryStatus(modeText);
         }
-
         function quickSwipe(direction) {
             if (pointWidth === 0 || pointHeight === 0) return;
 
@@ -829,32 +911,38 @@
                 end_y: endY,
                 duration: 0.3
             };
-
-            if (currentMode === 'video' && controlWs) {
+            // Send swipe regardless of mode - always use control WebSocket
+            if (controlWs) {
                 controlWs.send(JSON.stringify(swipeData));
+                showTemporaryStatus(`Quick swipe ${direction} performed`);
+            } else {
+                showTemporaryStatus(`Control connection not available`);
             }
-
-            showTemporaryStatus(`Quick swipe ${direction} performed`);
         }
 
         function pressButton(button) {
-            if (currentMode === 'video' && controlWs) {
+            // Send button press regardless of mode - always use control WebSocket
+            console.log(`Button pressed: ${button}`);
+            if (controlWs) {
                 controlWs.send(JSON.stringify({ t: 'button', button: button }));
+                showTemporaryStatus(`${button} button pressed`);
+            } else {
+                showTemporaryStatus(`Control connection not available`);
             }
-
-            showTemporaryStatus(`${button} button pressed`);
         }
 
         function sendText() {
             const text = textInput.value.trim();
             if (!text) return;
 
-            if (currentMode === 'video' && controlWs) {
+            // Send text regardless of mode - always use control WebSocket  
+            if (controlWs) {
                 controlWs.send(JSON.stringify({ t: 'text', text: text }));
+                showTemporaryStatus(`Text sent: "${text}"`);
+                textInput.value = '';
+            } else {
+                showTemporaryStatus(`Control connection not available`);
             }
-
-            showTemporaryStatus(`Text sent: "${text}"`);
-            textInput.value = '';
         }
 
         function clearText() {
@@ -876,6 +964,8 @@
         async function takeScreenshot() {
             if (currentMode === 'screenshot' && screenshotWs) {
                 screenshotWs.send(JSON.stringify({ t: 'refresh' }));
+            } else {
+                showTemporaryStatus('Screenshot refresh only works in screenshot mode');
             }
         }
 
@@ -975,21 +1065,20 @@
                     rtcpMuxPolicy: 'require'
                 });
 
-                // Handle incoming video stream with quality settings
+                // Handle incoming video stream with proper sizing
                 peerConnection.ontrack = (event) => {
                     console.log('WebRTC high-quality track received');
                     webrtcVideo.srcObject = event.streams[0];
 
-                    // Apply quality settings to video element
-                    webrtcVideo.style.imageRendering = 'auto';
-                    webrtcVideo.style.imageRendering = '-webkit-optimize-contrast';
+                    // Wait for video metadata to load, then size it properly
+                    webrtcVideo.onloadedmetadata = () => {
+                        resizeWebRTCVideo();
+                        setupWebRTCInteraction();
 
-                    setupWebRTCInteraction();
-
-                    status.textContent = '🚀 WebRTC High-Quality Stream - 60fps Ultra Low Latency';
-                    status.className = 'connected';
+                        status.textContent = '🚀 WebRTC High-Quality Stream - 60fps Ultra Low Latency';
+                        status.className = 'connected';
+                    };
                 };
-
                 // Enhanced connection state handling
                 peerConnection.onconnectionstatechange = () => {
                     console.log('WebRTC connection state:', peerConnection.connectionState);
@@ -1066,6 +1155,31 @@
             }
         }
 
+        function resizeWebRTCVideo() {
+            if (!webrtcVideo.videoWidth || !webrtcVideo.videoHeight) return;
+
+            const containerWidth = webrtcVideo.parentElement.clientWidth - 24; // Account for padding
+            const videoAspectRatio = webrtcVideo.videoWidth / webrtcVideo.videoHeight;
+
+            // Calculate display size similar to canvas sizing
+            let displayWidth = Math.min(containerWidth, 450);
+            let displayHeight = displayWidth / videoAspectRatio;
+
+            const maxHeight = window.innerHeight * 0.7;
+            if (displayHeight > maxHeight) {
+                displayHeight = maxHeight;
+                displayWidth = displayHeight * videoAspectRatio;
+            }
+
+            // Apply the calculated size
+            webrtcVideo.style.width = Math.round(displayWidth) + 'px';
+            webrtcVideo.style.height = Math.round(displayHeight) + 'px';
+            webrtcVideo.style.maxWidth = '100%';
+            webrtcVideo.style.maxHeight = '70vh';
+
+            console.log(`WebRTC video sized: ${displayWidth}x${displayHeight}`);
+        }
+
         function enhanceSDPForQuality(offer) {
             let sdp = offer.sdp;
 
@@ -1122,6 +1236,7 @@
             }
         }
 
+        // Update setupWebRTCInteraction to properly handle cursor changes
         function setupWebRTCInteraction() {
             // Set video dimensions for coordinate mapping
             webrtcVideo.onloadedmetadata = () => {
@@ -1180,11 +1295,13 @@
 
                 console.log(`WebRTC Tap: Display(${Math.round(clickX)}, ${Math.round(clickY)}) -> Point(${tapX}, ${tapY})`);
 
+                // Always use control WebSocket for taps in WebRTC mode
                 if (controlWs) {
                     controlWs.send(JSON.stringify({ t: 'tap', x: tapX, y: tapY }));
+                    showTemporaryStatus(`WebRTC Tap: (${tapX}, ${tapY})`);
+                } else {
+                    showTemporaryStatus(`Control connection not available`);
                 }
-
-                showTemporaryStatus(`WebRTC Tap: (${tapX}, ${tapY})`);
             }
         }
 
@@ -1210,11 +1327,13 @@
                     duration: 0.3
                 };
 
+                // Always use control WebSocket for swipes in WebRTC mode
                 if (controlWs) {
                     controlWs.send(JSON.stringify(swipeData));
+                    showTemporaryStatus(`WebRTC Swipe: (${startPointX}, ${startPointY}) → (${endPointX}, ${endPointY})`);
+                } else {
+                    showTemporaryStatus(`Control connection not available`);
                 }
-
-                showTemporaryStatus(`WebRTC Swipe: (${startPointX}, ${startPointY}) → (${endPointX}, ${endPointY})`);
             }
         }
 
@@ -1303,6 +1422,10 @@
 
             if (presets[preset]) {
                 webrtcQualitySettings = presets[preset];
+                currentWebRTCQuality = preset;
+
+                // Update button highlighting
+                updateWebRTCQualityButtonHighlight(preset);
 
                 // Apply immediately if connected
                 if (peerConnection && peerConnection.connectionState === 'connected') {
@@ -1313,9 +1436,31 @@
             }
         }
 
+        function updateWebRTCQualityButtonHighlight(selectedQuality) {
+            // Remove active class from all WebRTC quality buttons
+            const webrtcQualitySection = document.getElementById('webrtc-quality-section');
+            const qualityButtons = webrtcQualitySection.querySelectorAll('button');
+
+            qualityButtons.forEach(button => {
+                button.classList.remove('active');
+            });
+
+            // Add active class to selected quality button based on text content
+            qualityButtons.forEach(button => {
+                const buttonText = button.textContent.toLowerCase();
+                if (buttonText.includes(selectedQuality)) {
+                    button.classList.add('active');
+                }
+            });
+        }
+
+
+
         // Handle window resize to maintain aspect ratio
         window.addEventListener('resize', () => {
-            if (currentMode === 'video' && pixelWidth > 0) {
+            if (currentMode === 'webrtc' && webrtcVideo.videoWidth > 0) {
+                resizeWebRTCVideo();
+            } else if (currentMode === 'video' && pixelWidth > 0) {
                 // Trigger a resize recalculation
                 setTimeout(() => {
                     const img = new Image();
