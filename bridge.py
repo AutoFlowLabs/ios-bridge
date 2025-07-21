@@ -12,7 +12,7 @@ import threading
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-UDID = "A5072380-4703-4613-B756-097B7D749C4C"   
+UDID = "B8BA84BA-664B-4D0D-9627-AC67F9BF0685"   
 
 app = FastAPI()
 
@@ -40,9 +40,10 @@ def capture_screenshot_sync():
     """Synchronous screenshot capture for thread pool"""
     try:
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
-            # Use higher quality settings
-            cmd = ["idb", "screenshot", "--udid", UDID, temp_file.name]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            # Use the virtual environment idb path
+            idb_path = "/Users/himanshukukreja/autoflow/ios-bridge/venv/bin/idb"
+            cmd = [idb_path, "screenshot", "--udid", UDID, temp_file.name]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
             
             if result.returncode == 0 and os.path.exists(temp_file.name):
                 with open(temp_file.name, 'rb') as f:
@@ -72,10 +73,10 @@ async def capture_screenshot_optimized():
     
     current_time = time.time()
     
-    # Use cache if less than 16ms old (60 FPS target)
+    # Use cache if less than 33ms old (30 FPS target) - reduced from 16ms for better performance
     with screenshot_lock:
         if (screenshot_cache and 
-            current_time - screenshot_cache_time < 0.016):
+            current_time - screenshot_cache_time < 0.033):
             return screenshot_cache
     
     # Capture new screenshot in thread pool
@@ -119,8 +120,9 @@ async def get_point_dimensions():
         return point_dimensions_cache
     
     try:
-        cmd = ["idb", "describe", "--udid", UDID]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+        idb_path = "/Users/himanshukukreja/autoflow/ios-bridge/venv/bin/idb"
+        cmd = [idb_path, "describe", "--udid", UDID]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
         
         if result.returncode == 0:
             output = result.stdout
@@ -163,8 +165,9 @@ async def control_ws(ws: WebSocket):
             
             if ev["t"] == "tap":
                 x, y = ev["x"], ev["y"]
-                cmd = ["idb", "ui", "tap", str(x), str(y), "--udid", UDID]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                idb_path = "/Users/himanshukukreja/autoflow/ios-bridge/venv/bin/idb"
+                cmd = [idb_path, "ui", "tap", str(x), str(y), "--udid", UDID]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
                 
                 if result.returncode == 0:
                     logger.info(f"✅ Tap: ({x}, {y})")
@@ -178,8 +181,9 @@ async def control_ws(ws: WebSocket):
                 end_x, end_y = ev["end_x"], ev["end_y"]
                 duration = ev.get("duration", 0.5)
                 
-                cmd = ["idb", "ui", "swipe", str(start_x), str(start_y), str(end_x), str(end_y), "--duration", str(duration), "--udid", UDID]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                idb_path = "/Users/himanshukukreja/autoflow/ios-bridge/venv/bin/idb"
+                cmd = [idb_path, "ui", "swipe", str(start_x), str(start_y), str(end_x), str(end_y), "--duration", str(duration), "--udid", UDID]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
                 
                 if result.returncode == 0:
                     logger.info(f"✅ Swipe: ({start_x}, {start_y}) -> ({end_x}, {end_y})")
@@ -189,8 +193,9 @@ async def control_ws(ws: WebSocket):
                     
             elif ev["t"] == "text":
                 text = ev["text"]
-                cmd = ["idb", "ui", "text", text, "--udid", UDID]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                idb_path = "/Users/himanshukukreja/autoflow/ios-bridge/venv/bin/idb"
+                cmd = [idb_path, "ui", "text", text, "--udid", UDID]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
                 
                 if result.returncode == 0:
                     logger.info(f"✅ Text entered: {text}")
@@ -212,8 +217,9 @@ async def control_ws(ws: WebSocket):
                 
                 idb_button = button_mapping.get(button, button.upper())
                 
-                cmd = ["idb", "ui", "button", idb_button, "--udid", UDID]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                idb_path = "/Users/himanshukukreja/autoflow/ios-bridge/venv/bin/idb"
+                cmd = [idb_path, "ui", "button", idb_button, "--udid", UDID]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
                 
                 if result.returncode == 0:
                     logger.info(f"✅ Button pressed: {button} ({idb_button})")
