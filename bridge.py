@@ -13,6 +13,14 @@ import io
 import tempfile
 from PIL import Image
 import re
+import json
+import asyncio
+from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
+from aiortc.contrib.media import MediaPlayer
+import av
+from fractions import Fraction
+from threading import Event
+import uuid
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,10 +40,20 @@ video_streaming_active = False
 video_lock = threading.Lock()
 point_dimensions_cache = None
 
+# WebRTC globals
+webrtc_connections = {}
+webrtc_video_source = None
+webrtc_active = False
+webrtc_frame_event = Event()
+webrtc_current_frame = None
+
+
 def cleanup_processes():
     """Clean up video processes"""
     logger.info("Cleaning up video processes...")
     stop_video_capture()
+    logger.info("Stopping WebRTC capture...")
+    stop_webrtc_capture()
 
 atexit.register(cleanup_processes)
 signal.signal(signal.SIGTERM, lambda s, f: cleanup_processes())
@@ -480,6 +498,99 @@ async def get_point_dimensions():
     point_dimensions_cache = (390, 844)
     return point_dimensions_cache
 
+class SimulatorVideoTrack(VideoStreamTrack):
+    """Custom video track for iOS Simulator"""
+    
+    def __init__(self):
+        super().__init__()
+        self.frame_count = 0
+        
+    async def recv(self):
+        """Generate video frames for WebRTC"""
+        global webrtc_current_frame
+        
+        # Wait for a new frame
+        webrtc_frame_event.wait(timeout=0.05)
+        
+        if webrtc_current_frame is None:
+            # Generate a placeholder frame if no screenshot available
+            frame = av.VideoFrame.from_ndarray(
+                np.zeros((844, 390, 3), dtype=np.uint8), 
+                format='rgb24'
+            )
+        else:
+            frame = webrtc_current_frame
+            
+        frame.pts = self.frame_count
+        frame.time_base = Fraction(1, 30)  # 30 FPS
+        self.frame_count += 1
+        
+        return frame
+
+def webrtc_frame_producer():
+    """Continuously capture frames for WebRTC"""
+    global webrtc_current_frame, webrtc_active
+    
+    logger.info("Starting WebRTC frame producer...")
+    
+    while webrtc_active:
+        try:
+            # Capture screenshot
+            screenshot_data = capture_ultra_fast_screenshot()
+            if screenshot_data:
+                # Decode base64 image
+                image_bytes = base64.b64decode(screenshot_data["data"])
+                
+                # Convert to numpy array
+                with Image.open(io.BytesIO(image_bytes)) as img:
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Resize for optimal WebRTC performance
+                    img = img.resize((390, 844), Image.Resampling.LANCZOS)
+                    img_array = np.array(img)
+                
+                # Create AV frame
+                webrtc_current_frame = av.VideoFrame.from_ndarray(img_array, format='rgb24')
+                webrtc_frame_event.set()
+                webrtc_frame_event.clear()
+            
+            time.sleep(1/30)  # 30 FPS target
+            
+        except Exception as e:
+            logger.error(f"WebRTC frame producer error: {e}")
+            time.sleep(0.1)
+
+def start_webrtc_capture():
+    """Start WebRTC video capture"""
+    global webrtc_active, webrtc_frame_thread
+    
+    if webrtc_active:
+        return True
+    
+    try:
+        webrtc_active = True
+        webrtc_frame_thread = threading.Thread(target=webrtc_frame_producer, daemon=True)
+        webrtc_frame_thread.start()
+        logger.info("✅ WebRTC capture started")
+        return True
+    except Exception as e:
+        logger.error(f"❌ WebRTC capture failed: {e}")
+        return False
+
+def stop_webrtc_capture():
+    """Stop WebRTC video capture"""
+    global webrtc_active, webrtc_current_frame
+    
+    webrtc_active = False
+    webrtc_current_frame = None
+    
+    # Close all WebRTC connections
+    for pc in list(webrtc_connections.values()):
+        asyncio.create_task(pc.close())
+    webrtc_connections.clear()
+
+
 @app.websocket("/ws/control")
 async def control_ws(ws: WebSocket):
     """Control WebSocket for device interactions"""
@@ -685,6 +796,85 @@ async def screenshot_ws(ws: WebSocket):
     except WebSocketDisconnect:
         logger.info("Screenshot WebSocket disconnected")
 
+@app.websocket("/ws/webrtc")
+async def webrtc_signaling(websocket: WebSocket):
+    """WebRTC signaling WebSocket"""
+    await websocket.accept()
+    connection_id = str(uuid.uuid4())
+    logger.info(f"WebRTC signaling connected: {connection_id}")
+    
+    try:
+        # Start capture if not already running
+        if not webrtc_active:
+            start_webrtc_capture()
+        
+        async for message in websocket.iter_text():
+            try:
+                data = json.loads(message)
+                await handle_webrtc_message(websocket, connection_id, data)
+            except json.JSONDecodeError:
+                logger.error("Invalid JSON in WebRTC message")
+            except Exception as e:
+                logger.error(f"WebRTC message handling error: {e}")
+                
+    except Exception as e:
+        logger.error(f"WebRTC signaling error: {e}")
+    finally:
+        # Clean up connection
+        if connection_id in webrtc_connections:
+            await webrtc_connections[connection_id].close()
+            del webrtc_connections[connection_id]
+        
+        logger.info(f"WebRTC signaling disconnected: {connection_id}")
+        
+        # Stop capture if no more connections
+        if not webrtc_connections:
+            stop_webrtc_capture()
+
+async def handle_webrtc_message(websocket: WebSocket, connection_id: str, data: dict):
+    """Handle WebRTC signaling messages"""
+    message_type = data.get("type")
+    
+    if message_type == "offer":
+        # Create RTCPeerConnection
+        pc = RTCPeerConnection()
+        webrtc_connections[connection_id] = pc
+        
+        # Add video track
+        video_track = SimulatorVideoTrack()
+        pc.addTrack(video_track)
+        
+        @pc.on("connectionstatechange")
+        async def on_connectionstatechange():
+            logger.info(f"WebRTC connection state: {pc.connectionState}")
+            if pc.connectionState in ["failed", "closed"]:
+                if connection_id in webrtc_connections:
+                    del webrtc_connections[connection_id]
+        
+        # Set remote description
+        await pc.setRemoteDescription(RTCSessionDescription(
+            sdp=data["sdp"],
+            type=data["type"]
+        ))
+        
+        # Create answer
+        answer = await pc.createAnswer()
+        await pc.setLocalDescription(answer)
+        
+        # Send answer back
+        await websocket.send_text(json.dumps({
+            "type": "answer",
+            "sdp": pc.localDescription.sdp
+        }))
+        
+    elif message_type == "ice-candidate":
+        # Handle ICE candidate
+        if connection_id in webrtc_connections:
+            pc = webrtc_connections[connection_id]
+            candidate = data.get("candidate")
+            if candidate:
+                await pc.addIceCandidate(candidate)
+
 @app.get("/")
 def index():
     return FileResponse("static/index.html")
@@ -703,9 +893,11 @@ async def status():
         "simulator_accessible": simulator_accessible,
         "video_streaming": video_streaming_active,
         "video_clients": len(video_clients),
+        "webrtc_active": webrtc_active,
+        "webrtc_connections": len(webrtc_connections),
         "queue_size": video_frame_queue.qsize(),
         "capture_method": "hardware" if video_capture_process else "screenshots",
-        "status": "healthy" if video_streaming_active else "starting"
+        "status": "healthy" if (video_streaming_active or webrtc_active) else "starting"
     }
 
 @app.get("/debug/screenshot")
