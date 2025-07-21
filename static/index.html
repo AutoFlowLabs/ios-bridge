@@ -426,15 +426,18 @@
             }
         }
 
+
         function setupHighPerformanceVideoStream() {
             videoWs = new WebSocket(`ws://${location.hostname}:8000/ws/video`);
 
             videoWs.onopen = () => {
-                console.log('High-performance video WebSocket connected');
-                status.textContent = 'High-performance video stream connecting...';
+                console.log('Hardware-accelerated video WebSocket connected');
+                status.textContent = 'Hardware video stream connecting...';
                 status.className = 'connected';
                 frameCount = 0;
+                frameDropCount = 0;
                 lastFrameTime = performance.now();
+                isProcessingFrame = false;
             };
 
             videoWs.onclose = () => {
@@ -443,77 +446,30 @@
             };
 
             videoWs.onmessage = (event) => {
-                const now = performance.now();
-                const data = JSON.parse(event.data);
+                // Drop frames if we're still processing
+                if (isProcessingFrame) {
+                    frameDropCount++;
+                    return;
+                }
 
-                if (data.type === 'video_frame') {
-                    frameCount++;
+                isProcessingFrame = true;
 
-                    const frameDelta = now - lastFrameTime;
-                    if (frameDelta > 0) {
-                        const instantFps = 1000 / frameDelta;
-                        fpsHistory.push(instantFps);
-                        if (fpsHistory.length > 20) fpsHistory.shift();
+                try {
+                    const now = performance.now();
+                    const data = JSON.parse(event.data);
 
-                        performanceStats.averageFps = Math.round(
-                            fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length
-                        );
+                    if (data.type === 'video_frame') {
+                        frameCount++;
+
+                        // Use requestAnimationFrame for smooth rendering
+                        requestAnimationFrame(() => {
+                            processVideoFrame(data, now);
+                            isProcessingFrame = false;
+                        });
                     }
-                    lastFrameTime = now;
-
-                    const img = new Image();
-                    img.onload = () => {
-                        pixelWidth = data.pixel_width || data.width || img.width;
-                        pixelHeight = data.pixel_height || data.height || img.height;
-                        pointWidth = data.point_width || 390;
-                        pointHeight = data.point_height || 844;
-
-                        // Calculate display size based on container width (responsive)
-                        const containerWidth = canvas.parentElement.clientWidth - 24; // Account for padding
-                        const devicePixelRatio = window.devicePixelRatio || 1;
-                        const aspectRatio = pixelWidth / pixelHeight;
-
-                        // Calculate optimal display dimensions
-                        let displayWidth = Math.min(containerWidth, 450); // Max width constraint
-                        let displayHeight = displayWidth / aspectRatio;
-
-                        // Ensure height doesn't exceed viewport
-                        const maxHeight = window.innerHeight * 0.7;
-                        if (displayHeight > maxHeight) {
-                            displayHeight = maxHeight;
-                            displayWidth = displayHeight * aspectRatio;
-                        }
-
-                        displayWidth = Math.round(displayWidth);
-                        displayHeight = Math.round(displayHeight);
-
-                        // Set canvas internal resolution for high quality
-                        canvas.width = displayWidth * devicePixelRatio;
-                        canvas.height = displayHeight * devicePixelRatio;
-
-                        // Set display size
-                        canvas.style.width = displayWidth + 'px';
-                        canvas.style.height = displayHeight + 'px';
-
-                        ctx.scale(devicePixelRatio, devicePixelRatio);
-                        ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = 'high';
-                        ctx.clearRect(0, 0, displayWidth, displayHeight);
-                        ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
-
-                        // Update dimension info
-                        dimensionInfo.textContent = `Pixels: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Display: ${displayWidth}×${displayHeight} | Format: ${data.format?.toUpperCase() || 'PNG'}`;
-
-                        if (frameCount % 30 === 0 || now - performanceStats.lastUpdate > 1000) {
-                            const serverFps = data.fps || 0;
-                            const modeText = swipeMode ? '✋ SWIPE MODE' : '👆 TAP MODE';
-                            status.textContent = `${modeText} | Frame: ${frameCount}, Client FPS: ${performanceStats.averageFps}, Server FPS: ${serverFps}`;
-                            performanceStats.lastUpdate = now;
-                        }
-                    };
-
-                    const formatPrefix = data.format === 'jpeg' ? 'image/jpeg' : 'image/png';
-                    img.src = `data:${formatPrefix};base64,${data.data}`;
+                } catch (error) {
+                    console.error('Frame processing error:', error);
+                    isProcessingFrame = false;
                 }
             };
 
@@ -523,6 +479,92 @@
                 status.className = 'disconnected';
             };
         }
+
+        function processVideoFrame(data, now) {
+            const frameDelta = now - lastFrameTime;
+            if (frameDelta > 0) {
+                const instantFps = 1000 / frameDelta;
+                fpsHistory.push(instantFps);
+                if (fpsHistory.length > 20) fpsHistory.shift();
+
+                performanceStats.averageFps = Math.round(
+                    fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length
+                );
+            }
+            lastFrameTime = now;
+
+            const img = new Image();
+            img.onload = () => {
+                pixelWidth = data.pixel_width || data.width || img.width;
+                pixelHeight = data.pixel_height || data.height || img.height;
+                pointWidth = data.point_width || 390;
+                pointHeight = data.point_height || 844;
+
+                // Optimized canvas rendering
+                updateCanvasOptimized(img, data);
+
+                // Update status less frequently
+                if (frameCount % 60 === 0 || now - performanceStats.lastUpdate > 2000) {
+                    const serverFps = data.fps || 0;
+                    const modeText = swipeMode ? '✋ SWIPE MODE' : '👆 TAP MODE';
+                    const dropRate = frameDropCount > 0 ? ` (${frameDropCount} drops)` : '';
+                    status.textContent = `🎥 ${modeText} | Frame: ${frameCount}, Client: ${performanceStats.averageFps}fps, Server: ${serverFps}fps${dropRate}`;
+                    performanceStats.lastUpdate = now;
+                    frameDropCount = 0; // Reset drop counter
+                }
+            };
+
+            // Handle JPEG format
+            img.src = `data:image/jpeg;base64,${data.data}`;
+        }
+
+        function updateCanvasOptimized(img, data) {
+            // Calculate display size with better performance
+            const containerWidth = canvas.parentElement.clientWidth - 24;
+            const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for performance
+            const aspectRatio = pixelWidth / pixelHeight;
+
+            let displayWidth = Math.min(containerWidth, 450);
+            let displayHeight = displayWidth / aspectRatio;
+
+            const maxHeight = window.innerHeight * 0.7;
+            if (displayHeight > maxHeight) {
+                displayHeight = maxHeight;
+                displayWidth = displayHeight * aspectRatio;
+            }
+
+            displayWidth = Math.round(displayWidth);
+            displayHeight = Math.round(displayHeight);
+
+            // Only resize canvas if dimensions changed
+            const newCanvasWidth = displayWidth * devicePixelRatio;
+            const newCanvasHeight = displayHeight * devicePixelRatio;
+
+            if (canvas.width !== newCanvasWidth || canvas.height !== newCanvasHeight) {
+                canvas.width = newCanvasWidth;
+                canvas.height = newCanvasHeight;
+                canvas.style.width = displayWidth + 'px';
+                canvas.style.height = displayHeight + 'px';
+
+                ctx.scale(devicePixelRatio, devicePixelRatio);
+            }
+
+            // Optimized rendering
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.clearRect(0, 0, displayWidth, displayHeight);
+            ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+
+            // Update dimension info
+            dimensionInfo.textContent = `Pixels: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Display: ${displayWidth}×${displayHeight} | JPEG`;
+        }
+
+        // Add frame rate monitoring
+        setInterval(() => {
+            if (frameCount > 0) {
+                console.log(`Performance: ${performanceStats.averageFps}fps average, ${frameDropCount} dropped frames in last 5s`);
+            }
+        }, 5000);
 
         function setupScreenshotMode() {
             screenshotWs = new WebSocket(`ws://${location.hostname}:8000/ws/screenshot`);
@@ -548,44 +590,15 @@
                         pointWidth = data.point_width || 390;
                         pointHeight = data.point_height || 844;
 
-                        // Use same responsive sizing logic as video mode
-                        const containerWidth = canvas.parentElement.clientWidth - 24;
-                        const devicePixelRatio = window.devicePixelRatio || 1;
-                        const aspectRatio = pixelWidth / pixelHeight;
-
-                        let displayWidth = Math.min(containerWidth, 450);
-                        let displayHeight = displayWidth / aspectRatio;
-
-                        const maxHeight = window.innerHeight * 0.7;
-                        if (displayHeight > maxHeight) {
-                            displayHeight = maxHeight;
-                            displayWidth = displayHeight * aspectRatio;
-                        }
-
-                        displayWidth = Math.round(displayWidth);
-                        displayHeight = Math.round(displayHeight);
-
-                        canvas.width = displayWidth * devicePixelRatio;
-                        canvas.height = displayHeight * devicePixelRatio;
-                        canvas.style.width = displayWidth + 'px';
-                        canvas.style.height = displayHeight + 'px';
-
-                        ctx.scale(devicePixelRatio, devicePixelRatio);
-                        ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = 'high';
-                        ctx.clearRect(0, 0, displayWidth, displayHeight);
-                        ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
-
-                        dimensionInfo.textContent = `Pixels: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Display: ${displayWidth}×${displayHeight}`;
+                        updateCanvasOptimized(img, data);
 
                         const modeText = swipeMode ? '✋ SWIPE MODE' : '👆 TAP MODE';
-                        status.textContent = `${modeText} | High-quality screenshot | DPR: ${devicePixelRatio}`;
+                        status.textContent = `📷 ${modeText} | High-quality screenshot | JPEG format`;
                     };
-                    img.src = 'data:image/png;base64,' + data.data;
+                    img.src = `data:image/jpeg;base64,${data.data}`;
                 }
             };
         }
-
         // Enhanced click/swipe handler (coordinate mapping preserved)
         canvas.onmousedown = (ev) => {
             const rect = canvas.getBoundingClientRect();

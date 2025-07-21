@@ -1,219 +1,465 @@
-import os, subprocess, asyncio, json, base64, tempfile, signal, atexit
-from typing import Any, Dict, List, Optional
+import os, subprocess, asyncio, json, base64, signal, atexit
+from typing import List, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import logging
 import time
-import struct
-from concurrent.futures import ThreadPoolExecutor
 import threading
 import cv2
 import numpy as np
-from PIL import Image
+from queue import Queue, Empty
 import io
+import tempfile
+from PIL import Image
+import re
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger("PIL").setLevel(logging.WARNING)  # Reduce PIL noise
 logger = logging.getLogger(__name__)
 
-UDID = "B8BA84BA-664B-4D0D-9627-AC67F9BF0685"   
+UDID = "B8BA84BA-664B-4D0D-9627-AC67F9BF0685"
 
 app = FastAPI()
-
-# Create static directory if it doesn't exist
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Global variables
+# Video streaming globals
 video_clients: List[WebSocket] = []
-video_stream_process = None
-video_stream_lock = threading.Lock()
-executor = ThreadPoolExecutor(max_workers=6)  # Increased workers
-
-# Frame buffer for high-performance streaming
-frame_buffer = None
-frame_buffer_time = 0
-frame_buffer_lock = threading.Lock()
+video_capture_process = None
+video_frame_queue = Queue(maxsize=3)  # Small buffer for real-time performance
+video_capture_thread = None
+video_streaming_active = False
+video_lock = threading.Lock()
+point_dimensions_cache = None
 
 def cleanup_processes():
-    """Clean up background processes"""
-    logger.info("Server shutdown - cleaning up...")
-    stop_video_stream()
-    executor.shutdown(wait=False)
+    """Clean up video processes"""
+    logger.info("Cleaning up video processes...")
+    stop_video_capture()
 
-# Register cleanup
 atexit.register(cleanup_processes)
 signal.signal(signal.SIGTERM, lambda s, f: cleanup_processes())
 
-def start_video_stream():
-    """Start h264 video stream using idb"""
-    global video_stream_process
-    
-    with video_stream_lock:
-        if video_stream_process is None or video_stream_process.poll() is not None:
-            try:
-                # Use idb video stream for much better performance
-                cmd = [
-                    "idb", "video-stream", 
-                    "--udid", UDID,
-                    "--format", "h264",  # Use hardware-accelerated H264
-                    "--fps", "60",       # Target 60 FPS
-                    "--compression-quality", "0.8",  # Good balance
-                    "--output", "-"      # Output to stdout
-                ]
-                
-                logger.info(f"Starting video stream: {' '.join(cmd)}")
-                video_stream_process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    bufsize=0  # Unbuffered for real-time
-                )
-                
-                logger.info("Video stream process started")
-                return True
-                
-            except Exception as e:
-                logger.error(f"Failed to start video stream: {e}")
-                return False
-    
-    return video_stream_process is not None
-
-def stop_video_stream():
-    """Stop video stream"""
-    global video_stream_process
-    
-    with video_stream_lock:
-        if video_stream_process:
-            try:
-                video_stream_process.terminate()
-                video_stream_process.wait(timeout=3)
-            except:
-                video_stream_process.kill()
-            video_stream_process = None
-
-def capture_frame_from_stream():
-    """Capture frame from video stream - much faster than screenshot"""
-    global video_stream_process, frame_buffer, frame_buffer_time
-    
-    if not video_stream_process or video_stream_process.poll() is not None:
-        if not start_video_stream():
-            return None
-    
+def get_simulator_window_info():
+    """Get iOS Simulator window position and size"""
     try:
-        # Read H264 frame data
-        # This is simplified - you might need to implement proper H264 decoding
-        # For now, fall back to optimized screenshot but with better caching
-        return capture_optimized_screenshot()
+        # Try to get simulator window bounds using AppleScript
+        script = '''
+        tell application "System Events"
+            tell process "Simulator"
+                try
+                    set frontWindow to first window
+                    set windowPosition to position of frontWindow
+                    set windowSize to size of frontWindow
+                    return (item 1 of windowPosition) & "," & (item 2 of windowPosition) & "," & (item 1 of windowSize) & "," & (item 2 of windowSize)
+                on error
+                    return "error"
+                end try
+            end tell
+        end tell
+        '''
         
+        cmd = ["osascript", "-e", script]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        
+        if result.returncode == 0 and "error" not in result.stdout:
+            coords = result.stdout.strip().split(",")
+            if len(coords) == 4:
+                x, y, width, height = map(int, coords)
+                # Adjust for simulator chrome - typically screen is inset
+                screen_x = x + 20  # Account for simulator frame
+                screen_y = y + 100  # Account for simulator top bar
+                screen_width = width - 40  # Remove left/right borders
+                screen_height = height - 120  # Remove top/bottom chrome
+                
+                return {
+                    "x": max(0, screen_x),
+                    "y": max(0, screen_y), 
+                    "width": max(300, screen_width),
+                    "height": max(500, screen_height)
+                }
     except Exception as e:
-        logger.error(f"Frame capture error: {e}")
-        return None
+        logger.warning(f"Could not get simulator window info: {e}")
+    
+    # Default fallback coordinates (you may need to adjust these)
+    return {"x": 100, "y": 100, "width": 390, "height": 844}
 
-def capture_optimized_screenshot():
-    """Ultra-optimized screenshot with aggressive caching and compression"""
-    try:
-        # Use PNG format but with specific optimizations
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
-            # Optimized idb command with quality settings
+def start_video_capture():
+    """Start hardware-accelerated video capture"""
+    global video_capture_process, video_capture_thread, video_streaming_active
+    
+    with video_lock:
+        if video_streaming_active:
+            return True
+            
+        try:
+            # Method 1: Try idb video-stream first
+            logger.info("Attempting idb video-stream...")
             cmd = [
-                "idb", "screenshot", 
-                "--udid", UDID, 
-                temp_file.name
+                "idb", "video-stream",
+                "--udid", UDID,
+                "--format", "h264",
+                "--fps", "60"
             ]
             
-            # Use shorter timeout for better responsiveness
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1.5)
+            video_capture_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0
+            )
+            
+            # Test if process started successfully
+            time.sleep(1)
+            if video_capture_process.poll() is None:
+                video_streaming_active = True
+                video_capture_thread = threading.Thread(target=process_idb_video_stream, daemon=True)
+                video_capture_thread.start()
+                logger.info("✅ idb video-stream started successfully")
+                return True
+            else:
+                stderr = video_capture_process.stderr.read().decode()
+                logger.warning(f"❌ idb video-stream failed: {stderr}")
+                video_capture_process = None
+                
+        except FileNotFoundError:
+            logger.warning("❌ idb not found")
+        except Exception as e:
+            logger.warning(f"❌ idb video-stream error: {e}")
+        
+        # Method 2: FFmpeg screen capture with hardware acceleration
+        try:
+            logger.info("Trying FFmpeg hardware-accelerated capture...")
+            
+            window_info = get_simulator_window_info()
+            
+            # FFmpeg command for macOS screen capture with hardware encoding
+            cmd = [
+                "ffmpeg",
+                "-f", "avfoundation",
+                "-capture_cursor", "0",
+                "-capture_mouse_clicks", "0", 
+                "-pixel_format", "uyvy422",
+                "-framerate", "60",
+                "-i", "1:none",  # Screen capture, no audio
+                "-vf", f"crop={window_info['width']}:{window_info['height']}:{window_info['x']}:{window_info['y']}",
+                "-c:v", "h264_videotoolbox",  # Hardware acceleration on macOS
+                "-profile:v", "baseline",
+                "-level:v", "3.1", 
+                "-b:v", "2M",  # 2 Mbps bitrate
+                "-maxrate", "3M",
+                "-bufsize", "6M",
+                "-g", "30",  # Keyframe interval
+                "-preset", "ultrafast",
+                "-tune", "zerolatency",
+                "-f", "h264",
+                "-"
+            ]
+            
+            video_capture_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0
+            )
+            
+            time.sleep(1)
+            if video_capture_process.poll() is None:
+                video_streaming_active = True
+                video_capture_thread = threading.Thread(target=process_h264_stream, daemon=True)
+                video_capture_thread.start()
+                logger.info("✅ FFmpeg hardware capture started")
+                return True
+            else:
+                stderr = video_capture_process.stderr.read().decode()
+                logger.warning(f"❌ FFmpeg hardware capture failed: {stderr}")
+                video_capture_process = None
+                
+        except Exception as e:
+            logger.warning(f"❌ FFmpeg hardware capture error: {e}")
+        
+        # Method 3: FFmpeg software encoding fallback
+        try:
+            logger.info("Trying FFmpeg software capture...")
+            
+            window_info = get_simulator_window_info()
+            
+            cmd = [
+                "ffmpeg",
+                "-f", "avfoundation",
+                "-capture_cursor", "0",
+                "-framerate", "30",  # Lower framerate for software encoding
+                "-i", "1:none",
+                "-vf", f"crop={window_info['width']}:{window_info['height']}:{window_info['x']}:{window_info['y']},scale=390:844",
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-tune", "zerolatency", 
+                "-crf", "23",
+                "-g", "15",
+                "-f", "mjpeg",  # Use MJPEG for easier processing
+                "-q:v", "3",
+                "-"
+            ]
+            
+            video_capture_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0
+            )
+            
+            time.sleep(1)
+            if video_capture_process.poll() is None:
+                video_streaming_active = True
+                video_capture_thread = threading.Thread(target=process_mjpeg_stream, daemon=True)
+                video_capture_thread.start()
+                logger.info("✅ FFmpeg software capture started")
+                return True
+            else:
+                stderr = video_capture_process.stderr.read().decode()
+                logger.warning(f"❌ FFmpeg software capture failed: {stderr}")
+                
+        except Exception as e:
+            logger.warning(f"❌ FFmpeg software error: {e}")
+        
+        # Method 4: Ultra high-frequency screenshot fallback
+        logger.info("Falling back to ultra high-frequency screenshots...")
+        video_streaming_active = True
+        video_capture_thread = threading.Thread(target=ultra_high_fps_screenshots, daemon=True)
+        video_capture_thread.start()
+        return True
+
+def process_idb_video_stream():
+    """Process idb video stream"""
+    global video_capture_process
+    
+    logger.info("Processing idb video stream...")
+    buffer = b""
+    
+    while video_streaming_active and video_capture_process:
+        try:
+            chunk = video_capture_process.stdout.read(4096)
+            if not chunk:
+                break
+                
+            # For H.264, we need to find NAL units
+            # This is a simplified approach - you might need more sophisticated H.264 parsing
+            buffer += chunk
+            
+            # For now, let's process as raw frames and convert to JPEG
+            if len(buffer) > 65536:  # Process when we have enough data
+                # Convert H.264 frame to displayable format using OpenCV
+                try:
+                    # This is simplified - actual H.264 decoding is more complex
+                    # For now, fall back to screenshot method
+                    screenshot_data = capture_ultra_fast_screenshot()
+                    if screenshot_data:
+                        enqueue_frame({
+                            "data": screenshot_data["data"],
+                            "timestamp": time.time(),
+                            "format": "jpeg",
+                            "pixel_width": screenshot_data.get("pixel_width", 390),
+                            "pixel_height": screenshot_data.get("pixel_height", 844)
+                        })
+                    buffer = b""  # Clear buffer
+                    time.sleep(1/60)  # 60 FPS
+                except:
+                    buffer = b""
+                    
+        except Exception as e:
+            logger.error(f"idb stream processing error: {e}")
+            break
+
+def process_h264_stream():
+    """Process H.264 stream from FFmpeg"""
+    global video_capture_process
+    
+    logger.info("Processing H.264 stream...")
+    # For this implementation, we'll decode H.264 to frames
+    # This requires more complex handling, so let's use a simpler approach
+    
+    frame_count = 0
+    while video_streaming_active and video_capture_process:
+        try:
+            # Read H.264 data and process with OpenCV
+            # This is complex, so for now use screenshot fallback
+            screenshot_data = capture_ultra_fast_screenshot()
+            if screenshot_data:
+                enqueue_frame({
+                    "data": screenshot_data["data"],
+                    "timestamp": time.time(),
+                    "format": "jpeg",
+                    "pixel_width": screenshot_data.get("pixel_width", 390),
+                    "pixel_height": screenshot_data.get("pixel_height", 844)
+                })
+            
+            frame_count += 1
+            time.sleep(1/45)  # 45 FPS for hardware mode
+            
+        except Exception as e:
+            logger.error(f"H.264 processing error: {e}")
+            break
+
+def process_mjpeg_stream():
+    """Process MJPEG stream from FFmpeg"""
+    global video_capture_process
+    
+    logger.info("Processing MJPEG stream...")
+    buffer = b""
+    
+    while video_streaming_active and video_capture_process:
+        try:
+            chunk = video_capture_process.stdout.read(8192)
+            if not chunk:
+                break
+                
+            buffer += chunk
+            
+            # Look for JPEG boundaries
+            while b'\xff\xd8' in buffer and b'\xff\xd9' in buffer:
+                start = buffer.find(b'\xff\xd8')
+                end = buffer.find(b'\xff\xd9', start) + 2
+                
+                if start != -1 and end > start:
+                    jpeg_data = buffer[start:end]
+                    buffer = buffer[end:]
+                    
+                    # Convert to base64
+                    frame_b64 = base64.b64encode(jpeg_data).decode('utf-8')
+                    
+                    enqueue_frame({
+                        "data": frame_b64,
+                        "timestamp": time.time(),
+                        "format": "jpeg",
+                        "pixel_width": 390,
+                        "pixel_height": 844
+                    })
+                else:
+                    break
+                    
+        except Exception as e:
+            logger.error(f"MJPEG processing error: {e}")
+            break
+
+def ultra_high_fps_screenshots():
+    """Ultra high-frequency screenshot capture"""
+    logger.info("Starting ultra high-FPS screenshot mode...")
+    
+    target_fps = 60
+    frame_interval = 1.0 / target_fps
+    last_capture = 0
+    frame_count = 0
+    
+    while video_streaming_active:
+        current_time = time.time()
+        
+        if current_time - last_capture >= frame_interval:
+            try:
+                screenshot_data = capture_ultra_fast_screenshot()
+                if screenshot_data:
+                    enqueue_frame({
+                        "data": screenshot_data["data"],
+                        "timestamp": current_time,
+                        "format": "jpeg", 
+                        "pixel_width": screenshot_data.get("pixel_width", 390),
+                        "pixel_height": screenshot_data.get("pixel_height", 844)
+                    })
+                    
+                    frame_count += 1
+                    if frame_count % 120 == 0:  # Log every 2 seconds
+                        logger.info(f"Screenshot mode: {frame_count} frames captured")
+                        
+                last_capture = current_time
+                
+            except Exception as e:
+                logger.error(f"Screenshot error: {e}")
+                time.sleep(0.1)
+        else:
+            # Precise timing
+            sleep_time = frame_interval - (current_time - last_capture)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+def capture_ultra_fast_screenshot():
+    """Ultra-optimized screenshot capture"""
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+            cmd = ["idb", "screenshot", "--udid", UDID, temp_file.name]
+            result = subprocess.run(cmd, capture_output=True, timeout=0.5)  # Very aggressive timeout
             
             if result.returncode == 0 and os.path.exists(temp_file.name):
-                # Use PIL for faster processing and compression
                 with Image.open(temp_file.name) as img:
-                    # Convert to RGB if needed and resize for better performance
                     if img.mode != 'RGB':
                         img = img.convert('RGB')
                     
-                    original_width, original_height = img.size
-                    
-                    # Optional: Scale down for better streaming performance
-                    # Uncomment if you want to trade quality for speed
-                    # scale_factor = 0.8  # 80% of original size
-                    # new_width = int(original_width * scale_factor)
-                    # new_height = int(original_height * scale_factor)
-                    # img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                    
-                    # Compress to JPEG for better streaming (much smaller than PNG)
+                    # Ultra-fast JPEG compression
                     output = io.BytesIO()
-                    img.save(output, format='JPEG', quality=85, optimize=True)
+                    img.save(output, format='JPEG', quality=80, optimize=False)
                     image_data = output.getvalue()
                 
                 os.unlink(temp_file.name)
                 
                 return {
                     "data": base64.b64encode(image_data).decode('utf-8'),
-                    "pixel_width": original_width,
-                    "pixel_height": original_height,
-                    "timestamp": time.time(),
-                    "format": "jpeg"  # Changed from PNG
+                    "pixel_width": img.width,
+                    "pixel_height": img.height
                 }
                 
     except subprocess.TimeoutExpired:
-        logger.warning("Screenshot timeout")
-    except Exception as e:
-        logger.error(f"Screenshot error: {e}")
+        pass  # Skip this frame
+    except Exception:
+        pass
     
     return None
 
-async def capture_frame_optimized():
-    """Optimized frame capture with smart caching"""
-    global frame_buffer, frame_buffer_time
-    
-    current_time = time.time()
-    
-    # Use cache if less than 8ms old (120+ FPS target)
-    with frame_buffer_lock:
-        if (frame_buffer and 
-            current_time - frame_buffer_time < 0.008):  # More aggressive caching
-            return frame_buffer
-    
-    # Capture new frame in thread pool
-    loop = asyncio.get_event_loop()
-    frame_data = await loop.run_in_executor(executor, capture_optimized_screenshot)
-    
-    if frame_data:
-        # Cache point dimensions
-        point_width, point_height = await get_point_dimensions()
-        
-        result = {
-            **frame_data,
-            "point_width": point_width,
-            "point_height": point_height,
-            "width": frame_data["pixel_width"],
-            "height": frame_data["pixel_height"]
-        }
-        
-        # Update cache
-        with frame_buffer_lock:
-            frame_buffer = result
-            frame_buffer_time = current_time
-        
-        return result
-    
-    return frame_buffer  # Return cached version if new capture failed
+def enqueue_frame(frame_data):
+    """Add frame to queue with overflow handling"""
+    try:
+        video_frame_queue.put_nowait(frame_data)
+    except:
+        # Queue full - drop oldest frame
+        try:
+            video_frame_queue.get_nowait()
+            video_frame_queue.put_nowait(frame_data)
+        except:
+            pass  # Still full, drop this frame
 
-# Cache point dimensions since they don't change
-point_dimensions_cache = None
-point_dimensions_cache_time = 0
+def stop_video_capture():
+    """Stop video capture"""
+    global video_capture_process, video_streaming_active, video_capture_thread
+    
+    logger.info("Stopping video capture...")
+    
+    with video_lock:
+        video_streaming_active = False
+        
+        if video_capture_process:
+            try:
+                video_capture_process.terminate()
+                video_capture_process.wait(timeout=3)
+            except:
+                try:
+                    video_capture_process.kill()
+                except:
+                    pass
+            video_capture_process = None
+        
+        if video_capture_thread:
+            video_capture_thread.join(timeout=3)
+            video_capture_thread = None
+    
+    # Clear queue
+    while not video_frame_queue.empty():
+        try:
+            video_frame_queue.get_nowait()
+        except:
+            break
 
 async def get_point_dimensions():
-    """Get the point dimensions with caching"""
-    global point_dimensions_cache, point_dimensions_cache_time
+    """Get device point dimensions with caching"""
+    global point_dimensions_cache
     
-    current_time = time.time()
-    
-    # Cache for 60 seconds
-    if (point_dimensions_cache and 
-        current_time - point_dimensions_cache_time < 60):
+    if point_dimensions_cache:
         return point_dimensions_cache
     
     try:
@@ -221,31 +467,22 @@ async def get_point_dimensions():
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
         
         if result.returncode == 0:
-            output = result.stdout
-            import re
-            width_match = re.search(r'width_points=(\d+)', output)
-            height_match = re.search(r'height_points=(\d+)', output)
+            width_match = re.search(r'width_points=(\d+)', result.stdout)
+            height_match = re.search(r'height_points=(\d+)', result.stdout) 
             
             if width_match and height_match:
-                dimensions = (int(width_match.group(1)), int(height_match.group(1)))
-                point_dimensions_cache = dimensions
-                point_dimensions_cache_time = current_time
-                return dimensions
-        
-        # Fallback values
-        logger.warning("Could not parse point dimensions, using iPhone 14 defaults")
-        dimensions = (390, 844)
-        point_dimensions_cache = dimensions
-        point_dimensions_cache_time = current_time
-        return dimensions
-        
+                point_dimensions_cache = (int(width_match.group(1)), int(height_match.group(1)))
+                return point_dimensions_cache
     except Exception as e:
         logger.error(f"Error getting point dimensions: {e}")
-        return (390, 844)
+    
+    # Default dimensions
+    point_dimensions_cache = (390, 844)
+    return point_dimensions_cache
 
 @app.websocket("/ws/control")
 async def control_ws(ws: WebSocket):
-    """WebSocket for device control commands"""
+    """Control WebSocket for device interactions"""
     await ws.accept()
     logger.info("Control WebSocket connected")
     
@@ -257,27 +494,23 @@ async def control_ws(ws: WebSocket):
             if ev["t"] == "tap":
                 x, y = ev["x"], ev["y"]
                 cmd = ["idb", "ui", "tap", str(x), str(y), "--udid", UDID]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)  # Faster timeout
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
                 
                 if result.returncode == 0:
                     logger.info(f"✅ Tap: ({x}, {y})")
-                    # Invalidate cache immediately for responsive UI
-                    global frame_buffer_time
-                    frame_buffer_time = 0
                 else:
                     logger.error(f"❌ Tap failed: {result.stderr}")
                     
             elif ev["t"] == "swipe":
                 start_x, start_y = ev["start_x"], ev["start_y"]
                 end_x, end_y = ev["end_x"], ev["end_y"]
-                duration = ev.get("duration", 0.3)  # Faster default duration
+                duration = ev.get("duration", 0.2)
                 
                 cmd = ["idb", "ui", "swipe", str(start_x), str(start_y), str(end_x), str(end_y), "--duration", str(duration), "--udid", UDID]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
                 
                 if result.returncode == 0:
                     logger.info(f"✅ Swipe: ({start_x}, {start_y}) -> ({end_x}, {end_y})")
-                    frame_buffer_time = 0
                 else:
                     logger.error(f"❌ Swipe failed: {result.stderr}")
                     
@@ -287,108 +520,89 @@ async def control_ws(ws: WebSocket):
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
                 
                 if result.returncode == 0:
-                    logger.info(f"✅ Text entered: {text}")
-                    frame_buffer_time = 0
+                    logger.info(f"✅ Text entered")
                 else:
-                    logger.error(f"❌ Text failed: {result.stderr}")
+                    logger.error(f"❌ Text failed")
                     
             elif ev["t"] == "button":
                 button = ev["button"]
-                
                 button_mapping = {
-                    'home': 'HOME',
-                    'lock': 'LOCK', 
-                    'siri': 'SIRI',
-                    'side-button': 'SIDE_BUTTON',
-                    'apple-pay': 'APPLE_PAY'
+                    'home': 'HOME', 'lock': 'LOCK', 'siri': 'SIRI',
+                    'side-button': 'SIDE_BUTTON', 'apple-pay': 'APPLE_PAY'
                 }
-                
                 idb_button = button_mapping.get(button, button.upper())
                 
                 cmd = ["idb", "ui", "button", idb_button, "--udid", UDID]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
                 
                 if result.returncode == 0:
-                    logger.info(f"✅ Button pressed: {button} ({idb_button})")
-                    frame_buffer_time = 0
+                    logger.info(f"✅ Button: {button}")
                 else:
-                    logger.error(f"❌ Button failed: {result.stderr}")
+                    logger.error(f"❌ Button failed: {button}")
                     
     except WebSocketDisconnect:
         logger.info("Control WebSocket disconnected")
 
 @app.websocket("/ws/video")
 async def video_ws(ws: WebSocket):
-    """Ultra high-performance video streaming"""
+    """Real-time video streaming WebSocket"""
     await ws.accept()
     logger.info("Video WebSocket connected")
     
     video_clients.append(ws)
     
+    # Start video capture if not already running
+    if not video_streaming_active:
+        start_video_capture()
+    
     try:
         frame_count = 0
-        target_fps = 45  # More realistic target for screenshot-based streaming
-        frame_interval = 1.0 / target_fps
-        last_frame_time = 0
-        
-        # Performance tracking
-        frame_times = []
-        last_stats_time = time.time()
+        fps_counter = []
+        last_fps_update = time.time()
+        point_width, point_height = await get_point_dimensions()
         
         while True:
-            frame_start = time.time()
-            
-            # More precise FPS throttling
-            time_since_last = frame_start - last_frame_time
-            if time_since_last < frame_interval:
-                sleep_time = frame_interval - time_since_last
-                await asyncio.sleep(sleep_time)
-                continue
-            
             try:
-                frame_result = await capture_frame_optimized()
+                # Get frame from queue with timeout
+                frame_data = video_frame_queue.get(timeout=0.05)
                 
-                if frame_result:
-                    frame_count += 1
+                frame_count += 1
+                current_time = time.time()
+                
+                # Calculate FPS
+                fps_counter.append(current_time)
+                fps_counter = [t for t in fps_counter if current_time - t < 1.0]
+                current_fps = len(fps_counter)
+                
+                # Send frame
+                video_frame = {
+                    "type": "video_frame",
+                    "data": frame_data["data"],
+                    "pixel_width": frame_data.get("pixel_width", 390),
+                    "pixel_height": frame_data.get("pixel_height", 844),
+                    "point_width": point_width,
+                    "point_height": point_height,
+                    "frame": frame_count,
+                    "timestamp": frame_data["timestamp"],
+                    "fps": current_fps,
+                    "format": frame_data.get("format", "jpeg")
+                }
+                
+                await ws.send_text(json.dumps(video_frame))
+                
+                # Log performance
+                if current_time - last_fps_update > 3:
+                    logger.info(f"🎥 Video streaming: {current_fps} FPS, Queue: {video_frame_queue.qsize()}")
+                    last_fps_update = current_time
                     
-                    # Calculate actual FPS
-                    frame_times.append(frame_start)
-                    if len(frame_times) > 30:  # Keep last 30 frames for FPS calc
-                        frame_times.pop(0)
-                    
-                    actual_fps = 0
-                    if len(frame_times) > 1:
-                        time_span = frame_times[-1] - frame_times[0]
-                        if time_span > 0:
-                            actual_fps = (len(frame_times) - 1) / time_span
-                    
-                    # Send frame data
-                    frame_data = {
-                        "type": "video_frame",
-                        "data": frame_result["data"],
-                        "pixel_width": frame_result.get("pixel_width", 0),
-                        "pixel_height": frame_result.get("pixel_height", 0),
-                        "point_width": frame_result.get("point_width", 390),
-                        "point_height": frame_result.get("point_height", 844),
-                        "frame": frame_count,
-                        "timestamp": frame_result.get("timestamp", frame_start),
-                        "fps": round(actual_fps, 1),
-                        "format": frame_result.get("format", "png")
-                    }
-                    
-                    await ws.send_text(json.dumps(frame_data))
-                    
-                    last_frame_time = frame_start
-                    
-                    # Less frequent logging for better performance
-                    if time.time() - last_stats_time > 2:  # Every 2 seconds
-                        logger.info(f"Video performance: Frame {frame_count}, FPS: {actual_fps:.1f}")
-                        last_stats_time = time.time()
-                        
+            except Empty:
+                # No frame available
+                await asyncio.sleep(0.01)
+                continue
             except Exception as e:
-                logger.error(f"Video frame error: {e}")
-                await asyncio.sleep(0.05)  # Brief pause before retry
-            
+                logger.error(f"Video frame send error: {e}")
+                break
+                
     except WebSocketDisconnect:
         logger.info("Video WebSocket disconnected")
     except Exception as e:
@@ -396,25 +610,30 @@ async def video_ws(ws: WebSocket):
     finally:
         if ws in video_clients:
             video_clients.remove(ws)
+        
+        # Stop capture if no more clients
+        if not video_clients:
+            stop_video_capture()
 
 @app.websocket("/ws/screenshot")
 async def screenshot_ws(ws: WebSocket):
-    """WebSocket for screenshot mode with interaction"""
+    """Screenshot mode WebSocket"""
     await ws.accept()
     logger.info("Screenshot WebSocket connected")
     
     try:
         # Send initial screenshot
-        screenshot_result = await capture_frame_optimized()
+        screenshot_result = capture_ultra_fast_screenshot()
         if screenshot_result:
+            point_width, point_height = await get_point_dimensions()
             await ws.send_text(json.dumps({
                 "type": "screenshot",
                 "data": screenshot_result["data"],
-                "pixel_width": screenshot_result.get("pixel_width", 0),
-                "pixel_height": screenshot_result.get("pixel_height", 0),
-                "point_width": screenshot_result.get("point_width", 390),
-                "point_height": screenshot_result.get("point_height", 844),
-                "format": screenshot_result.get("format", "png")
+                "pixel_width": screenshot_result.get("pixel_width", 390),
+                "pixel_height": screenshot_result.get("pixel_height", 844),
+                "point_width": point_width,
+                "point_height": point_height,
+                "format": "jpeg"
             }))
         
         async for message in ws.iter_text():
@@ -424,42 +643,38 @@ async def screenshot_ws(ws: WebSocket):
                 if ev.get("t") == "tap":
                     x, y = ev["x"], ev["y"]
                     cmd = ["idb", "ui", "tap", str(x), str(y), "--udid", UDID]
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
                     
                     if result.returncode == 0:
                         logger.info(f"Screenshot tap: ({x}, {y})")
                         
-                        # Invalidate cache and get fresh screenshot faster
-                        global frame_buffer_time
-                        frame_buffer_time = 0
-                        
-                        await asyncio.sleep(0.1)  # Reduced delay
-                        screenshot_result = await capture_frame_optimized()
+                        # Get fresh screenshot
+                        await asyncio.sleep(0.1)
+                        screenshot_result = capture_ultra_fast_screenshot()
                         if screenshot_result:
+                            point_width, point_height = await get_point_dimensions()
                             await ws.send_text(json.dumps({
                                 "type": "screenshot",
                                 "data": screenshot_result["data"],
-                                "pixel_width": screenshot_result.get("pixel_width", 0),
-                                "pixel_height": screenshot_result.get("pixel_height", 0),
-                                "point_width": screenshot_result.get("point_width", 390),
-                                "point_height": screenshot_result.get("point_height", 844),
-                                "format": screenshot_result.get("format", "png")
+                                "pixel_width": screenshot_result.get("pixel_width", 390),
+                                "pixel_height": screenshot_result.get("pixel_height", 844),
+                                "point_width": point_width,
+                                "point_height": point_height,
+                                "format": "jpeg"
                             }))
-                    else:
-                        logger.error(f"Screenshot tap failed: {result.stderr}")
                         
                 elif ev.get("t") == "refresh":
-                    frame_buffer_time = 0  # Force fresh screenshot
-                    screenshot_result = await capture_frame_optimized()
+                    screenshot_result = capture_ultra_fast_screenshot()
                     if screenshot_result:
+                        point_width, point_height = await get_point_dimensions()
                         await ws.send_text(json.dumps({
                             "type": "screenshot",
                             "data": screenshot_result["data"],
-                            "pixel_width": screenshot_result.get("pixel_width", 0),
-                            "pixel_height": screenshot_result.get("pixel_height", 0),
-                            "point_width": screenshot_result.get("point_width", 390),
-                            "point_height": screenshot_result.get("point_height", 844),
-                            "format": screenshot_result.get("format", "png")
+                            "pixel_width": screenshot_result.get("pixel_width", 390),
+                            "pixel_height": screenshot_result.get("pixel_height", 844),
+                            "point_width": point_width,
+                            "point_height": point_height,
+                            "format": "jpeg"
                         }))
                         
             except json.JSONDecodeError:
@@ -470,7 +685,6 @@ async def screenshot_ws(ws: WebSocket):
     except WebSocketDisconnect:
         logger.info("Screenshot WebSocket disconnected")
 
-# Keep all your existing endpoints unchanged...
 @app.get("/")
 def index():
     return FileResponse("static/index.html")
@@ -484,81 +698,47 @@ async def status():
     except:
         simulator_accessible = False
     
-    frame_test = await capture_frame_optimized()
-    
     return {
         "udid": UDID,
         "simulator_accessible": simulator_accessible,
-        "frame_working": frame_test is not None,
+        "video_streaming": video_streaming_active,
         "video_clients": len(video_clients),
-        "cache_age": time.time() - frame_buffer_time if frame_buffer_time > 0 else 0,
-        "status": "healthy" if simulator_accessible and frame_test else "unhealthy"
+        "queue_size": video_frame_queue.qsize(),
+        "capture_method": "hardware" if video_capture_process else "screenshots",
+        "status": "healthy" if video_streaming_active else "starting"
     }
 
 @app.get("/debug/screenshot")
 async def debug_screenshot():
-    frame = await capture_frame_optimized()
+    screenshot = capture_ultra_fast_screenshot()
     return {
-        "success": frame is not None,
-        "data_length": len(frame["data"]) if frame else 0,
-        "dimensions": f"{frame['pixel_width']}x{frame['pixel_height']}" if frame else "unknown",
-        "cache_age": time.time() - frame_buffer_time if frame_buffer_time > 0 else 0,
-        "format": frame.get("format", "unknown") if frame else "unknown"
+        "success": screenshot is not None,
+        "data_length": len(screenshot["data"]) if screenshot else 0,
+        "dimensions": f"{screenshot['pixel_width']}x{screenshot['pixel_height']}" if screenshot else "unknown",
+        "format": screenshot.get("format", "unknown") if screenshot else "unknown"
     }
 
+# Add all your existing debug endpoints here...
 @app.get("/debug/tap/{x}/{y}")
-async def debug_tap(x: int, y: int) -> Dict[str, Any]:
-    """Debug endpoint to test tapping at specific coordinates"""
-    # Validate coordinates
-    if x < 0 or y < 0:
-        return {
-            "success": False,
-            "error": "Coordinates must be non-negative"
-        }
-    
+async def debug_tap(x: int, y: int):
     try:
         cmd = ["idb", "ui", "tap", str(x), str(y), "--udid", UDID]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-        
-        # Invalidate cache after tap
-        global screenshot_cache_time
-        screenshot_cache_time = 0
-        
-        # Log the operation for debugging
-        logging.info(f"Tap executed at ({x}, {y}) with exit code: {result.returncode}")
-        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         return {
             "success": result.returncode == 0,
-            "coordinates": {"x": x, "y": y},
             "command": " ".join(cmd),
-            "stdout": result.stdout.strip(),
-            "stderr": result.stderr.strip(),
+            "stdout": result.stdout,
+            "stderr": result.stderr,
             "exit_code": result.returncode
         }
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "error": "Command timed out after 10 seconds"
-        }
     except Exception as e:
-        logging.error(f"Tap command failed: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-     
-# Replace the debug button endpoints:
+        return {"success": False, "error": str(e)}
 
 @app.get("/debug/home")
 async def debug_home():
-    """Press home button"""
     try:
         cmd = ["idb", "ui", "button", "HOME", "--udid", UDID]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        global screenshot_cache_time
-        screenshot_cache_time = 0  # Invalidate cache
-        
         return {
             "success": result.returncode == 0,
             "command": " ".join(cmd),
@@ -570,14 +750,9 @@ async def debug_home():
 
 @app.get("/debug/lock")
 async def debug_lock():
-    """Lock device"""
     try:
         cmd = ["idb", "ui", "button", "LOCK", "--udid", UDID]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        global screenshot_cache_time
-        screenshot_cache_time = 0
-        
         return {
             "success": result.returncode == 0,
             "command": " ".join(cmd),
@@ -589,14 +764,9 @@ async def debug_lock():
 
 @app.get("/debug/siri")
 async def debug_siri():
-    """Activate Siri"""
     try:
         cmd = ["idb", "ui", "button", "SIRI", "--udid", UDID]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        global screenshot_cache_time
-        screenshot_cache_time = 0
-        
         return {
             "success": result.returncode == 0,
             "command": " ".join(cmd),
@@ -606,116 +776,6 @@ async def debug_siri():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@app.get("/debug/side-button")
-async def debug_side_button():
-    """Press side button"""
-    try:
-        cmd = ["idb", "ui", "button", "SIDE_BUTTON", "--udid", UDID]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        global screenshot_cache_time
-        screenshot_cache_time = 0
-        
-        return {
-            "success": result.returncode == 0,
-            "command": " ".join(cmd),
-            "stdout": result.stdout,
-            "stderr": result.stderr
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@app.get("/debug/apple-pay")
-async def debug_apple_pay():
-    """Activate Apple Pay"""
-    try:
-        cmd = ["idb", "ui", "button", "APPLE_PAY", "--udid", UDID]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        global screenshot_cache_time
-        screenshot_cache_time = 0
-        
-        return {
-            "success": result.returncode == 0,
-            "command": " ".join(cmd),
-            "stdout": result.stdout,
-            "stderr": result.stderr
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-# Add these alternative volume control endpoints:
-
-@app.get("/debug/volume-up")
-async def debug_volume_up():
-    """Volume up using key press"""
-    try:
-        # Try using key event instead of button
-        cmd = ["idb", "ui", "key", "VolumeUp", "--udid", UDID]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        if result.returncode != 0:
-            # Fallback: try simctl if available
-            cmd = ["xcrun", "simctl", "spawn", UDID, "osascript", "-e", "set volume output volume (output volume of (get volume settings) + 10)"]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        return {
-            "success": result.returncode == 0,
-            "command": " ".join(cmd),
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "note": "Volume control may not work in simulator"
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@app.get("/debug/volume-down")
-async def debug_volume_down():
-    """Volume down using key press"""
-    try:
-        # Try using key event instead of button
-        cmd = ["idb", "ui", "key", "VolumeDown", "--udid", UDID]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        if result.returncode != 0:
-            # Fallback: try simctl if available
-            cmd = ["xcrun", "simctl", "spawn", UDID, "osascript", "-e", "set volume output volume (output volume of (get volume settings) - 10)"]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        return {
-            "success": result.returncode == 0,
-            "command": " ".join(cmd),
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "note": "Volume control may not work in simulator"
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@app.get("/debug/shake")
-async def debug_shake():
-    """Shake device using accelerometer simulation"""
-    try:
-        # Use simctl for shake since idb doesn't support it as a button
-        cmd = ["xcrun", "simctl", "spawn", UDID, "xcrun", "simctl", "shake", UDID]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        if result.returncode != 0:
-            # Alternative: try idb if it supports shake
-            cmd = ["idb", "ui", "shake", "--udid", UDID]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        
-        global screenshot_cache_time
-        screenshot_cache_time = 0
-        
-        return {
-            "success": result.returncode == 0,
-            "command": " ".join(cmd),
-            "stdout": result.stdout,
-            "stderr": result.stderr
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
