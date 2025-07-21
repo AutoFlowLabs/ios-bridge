@@ -318,10 +318,22 @@
                 <h3>📱 Stream Mode</h3>
                 <div class="mode-toggle controls-grid">
                     <button onclick="switchMode('webrtc')">🚀 WebRTC Stream</button>
-                    <button onclick="switchMode('video')">🎥 Video Mode</button>
+                    <button onclick="switchMode('video')">🎥 WebSocket Stream</button>
                     <button onclick="switchMode('screenshot')">📷 Screenshot Mode</button>
                 </div>
             </div>
+
+             <div class="controls-section">
+                <h3>🎬 WebRTC Quality</h3>
+                <div class="mode-toggle controls-grid">
+                    <button onclick="setWebRTCQuality('medium')">📺 Medium</button>
+                    <button onclick="setWebRTCQuality('high')">🏆 High</button>
+                    <button onclick="setWebRTCQuality('ultra')">💎 Ultra</button>
+                </div>
+                <div style="font-size: 11px; color: #666; margin-top: 8px; text-align: center;">
+                    Medium: 45fps/3Mbps | High: 60fps/5Mbps | Ultra: 60fps/8Mbps
+                </div>
+                </div>
 
             <div class="controls-section system-controls">
                 <h3>🎮 System Controls</h3>
@@ -407,6 +419,11 @@
             lastStatsTime: 0,
             latency: 0,
             fps: 0
+        };
+        let webrtcQualitySettings = {
+            fps: 60,
+            resolution: 'high',
+            bitrate: 5000000  // 5 Mbps
         };
 
 
@@ -945,36 +962,45 @@
             }
         }
 
+
         async function setupWebRTCStream() {
-            status.textContent = 'Initializing WebRTC stream...';
+            status.textContent = 'Initializing high-quality WebRTC stream...';
             status.className = 'connected';
 
             try {
-                // Create WebRTC connection
+                // Create WebRTC connection with optimized settings
                 peerConnection = new RTCPeerConnection({
-                    iceServers: []  // Local connection, no STUN/TURN needed
+                    iceServers: [],
+                    bundlePolicy: 'max-bundle',
+                    rtcpMuxPolicy: 'require'
                 });
 
-                // Handle incoming video stream
+                // Handle incoming video stream with quality settings
                 peerConnection.ontrack = (event) => {
-                    console.log('WebRTC track received');
+                    console.log('WebRTC high-quality track received');
                     webrtcVideo.srcObject = event.streams[0];
 
-                    // Set up click handling for WebRTC video
+                    // Apply quality settings to video element
+                    webrtcVideo.style.imageRendering = 'auto';
+                    webrtcVideo.style.imageRendering = '-webkit-optimize-contrast';
+
                     setupWebRTCInteraction();
 
-                    status.textContent = '🚀 WebRTC stream connected - Ultra low latency';
+                    status.textContent = '🚀 WebRTC High-Quality Stream - 60fps Ultra Low Latency';
                     status.className = 'connected';
                 };
 
+                // Enhanced connection state handling
                 peerConnection.onconnectionstatechange = () => {
                     console.log('WebRTC connection state:', peerConnection.connectionState);
 
                     if (peerConnection.connectionState === 'connected') {
                         startWebRTCStatsMonitoring();
+                        optimizeWebRTCQuality();
                     } else if (peerConnection.connectionState === 'failed') {
-                        status.textContent = 'WebRTC connection failed';
+                        status.textContent = 'WebRTC connection failed - retrying...';
                         status.className = 'disconnected';
+                        setTimeout(() => setupWebRTCStream(), 2000);
                     }
                 };
 
@@ -984,18 +1010,21 @@
                 webrtcWs.onopen = async () => {
                     console.log('WebRTC signaling connected');
 
-                    // Create offer
+                    // Create offer with quality constraints
                     const offer = await peerConnection.createOffer({
                         offerToReceiveVideo: true,
-                        offerToReceiveAudio: false
+                        offerToReceiveAudio: false,
+                        voiceActivityDetection: false
                     });
 
-                    await peerConnection.setLocalDescription(offer);
+                    // Enhance SDP for better quality
+                    const enhancedOffer = enhanceSDPForQuality(offer);
+                    await peerConnection.setLocalDescription(enhancedOffer);
 
-                    // Send offer
+                    // Send enhanced offer
                     webrtcWs.send(JSON.stringify({
                         type: 'offer',
-                        sdp: offer.sdp
+                        sdp: enhancedOffer.sdp
                     }));
                 };
 
@@ -1003,10 +1032,12 @@
                     const data = JSON.parse(event.data);
 
                     if (data.type === 'answer') {
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription({
+                        const enhancedAnswer = enhanceSDPForQuality({
                             type: 'answer',
                             sdp: data.sdp
-                        }));
+                        });
+
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(enhancedAnswer));
                     } else if (data.type === 'ice-candidate') {
                         if (data.candidate) {
                             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
@@ -1032,6 +1063,62 @@
                 console.error('WebRTC setup error:', error);
                 status.textContent = 'WebRTC setup failed';
                 status.className = 'disconnected';
+            }
+        }
+
+        function enhanceSDPForQuality(offer) {
+            let sdp = offer.sdp;
+
+            // Increase bitrate
+            sdp = sdp.replace(/b=AS:\d+/g, `b=AS:${webrtcQualitySettings.bitrate / 1000}`);
+
+            // Add bitrate constraints if not present
+            if (!sdp.includes('b=AS:')) {
+                sdp = sdp.replace(/(m=video.*)/g, `$1\r\nb=AS:${webrtcQualitySettings.bitrate / 1000}`);
+            }
+
+            // Enhance H.264 parameters for quality
+            sdp = sdp.replace(
+                /(a=fmtp:\d+ .*profile-level-id=42e01f)/g,
+                '$1;max-br=5000;max-mbps=245760;max-fs=8160'
+            );
+
+            // Set high frame rate
+            sdp = sdp.replace(/(a=framerate:)\d+/g, `$1${webrtcQualitySettings.fps}`);
+
+            // Add frame rate if not present
+            if (!sdp.includes('a=framerate:')) {
+                sdp = sdp.replace(/(m=video.*)/g, `$1\r\na=framerate:${webrtcQualitySettings.fps}`);
+            }
+
+            return {
+                type: offer.type,
+                sdp: sdp
+            };
+        }
+
+
+        // Function to optimize WebRTC quality after connection
+        async function optimizeWebRTCQuality() {
+            if (!peerConnection) return;
+
+            try {
+                const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) {
+                    const params = sender.getParameters();
+
+                    // Optimize encoding parameters
+                    if (params.encodings && params.encodings.length > 0) {
+                        params.encodings[0].maxBitrate = webrtcQualitySettings.bitrate;
+                        params.encodings[0].maxFramerate = webrtcQualitySettings.fps;
+                        params.encodings[0].scaleResolutionDownBy = 1; // No downscaling
+
+                        await sender.setParameters(params);
+                        console.log('WebRTC quality parameters optimized');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to optimize WebRTC quality:', error);
             }
         }
 
@@ -1134,8 +1221,9 @@
         function startWebRTCStatsMonitoring() {
             if (!peerConnection) return;
 
-            setInterval(async () => {
+            let statsInterval = setInterval(async () => {
                 if (!peerConnection || peerConnection.connectionState !== 'connected') {
+                    clearInterval(statsInterval);
                     return;
                 }
 
@@ -1149,10 +1237,17 @@
 
                             if (webrtcStats.lastStatsTime > 0 && deltaTime > 0) {
                                 const deltaFrames = report.framesReceived - webrtcStats.framesReceived;
+                                const deltaBytes = report.bytesReceived - webrtcStats.bytesReceived;
+
                                 webrtcStats.fps = Math.round(deltaFrames / deltaTime);
+                                webrtcStats.bitrate = Math.round((deltaBytes * 8) / deltaTime / 1000); // kbps
+                                webrtcStats.resolution = `${report.frameWidth}x${report.frameHeight}`;
+                                webrtcStats.framesDropped = report.framesDropped || 0;
+                                webrtcStats.jitter = report.jitter || 0;
                             }
 
                             webrtcStats.framesReceived = report.framesReceived;
+                            webrtcStats.bytesReceived = report.bytesReceived;
                             webrtcStats.lastStatsTime = now;
 
                             updateWebRTCInfo();
@@ -1167,14 +1262,55 @@
         function updateWebRTCInfo() {
             if (currentMode !== 'webrtc') return;
 
-            dimensionInfo.textContent = `WebRTC: ${pixelWidth}×${pixelHeight} | Points: ${pointWidth}×${pointHeight} | Ultra Low Latency`;
-
             const fps = webrtcStats.fps || 0;
+            const bitrate = webrtcStats.bitrate || 0;
+            const resolution = webrtcStats.resolution || `${pixelWidth}×${pixelHeight}`;
+            const dropped = webrtcStats.framesDropped || 0;
+
+            dimensionInfo.textContent = `WebRTC: ${resolution} | Points: ${pointWidth}×${pointHeight} | ${bitrate}kbps`;
+
             let latencyClass = 'latency-low';
             let latencyText = 'Ultra Low';
+            let qualityText = 'Excellent';
 
-            qualityInfo.textContent = `FPS: ${fps} | Quality: Excellent`;
+            // Determine quality based on FPS and bitrate
+            if (fps >= 55 && bitrate >= 3000) {
+                qualityText = 'Ultra High';
+                latencyClass = 'latency-low';
+            } else if (fps >= 45 && bitrate >= 2000) {
+                qualityText = 'High';
+                latencyClass = 'latency-low';
+            } else if (fps >= 30 && bitrate >= 1000) {
+                qualityText = 'Good';
+                latencyClass = 'latency-medium';
+            } else {
+                qualityText = 'Fair';
+                latencyClass = 'latency-high';
+                latencyText = 'Medium';
+            }
+
+            qualityInfo.textContent = `FPS: ${fps} | Quality: ${qualityText} | Dropped: ${dropped}`;
             latencyInfo.innerHTML = `<span class="latency-indicator ${latencyClass}"></span>Latency: ${latencyText}`;
+        }
+
+        function setWebRTCQuality(preset) {
+            const presets = {
+                'low': { fps: 30, bitrate: 1500000 },      // 1.5 Mbps, 30fps
+                'medium': { fps: 45, bitrate: 3000000 },   // 3 Mbps, 45fps  
+                'high': { fps: 60, bitrate: 5000000 },     // 5 Mbps, 60fps
+                'ultra': { fps: 60, bitrate: 8000000 }     // 8 Mbps, 60fps
+            };
+
+            if (presets[preset]) {
+                webrtcQualitySettings = presets[preset];
+
+                // Apply immediately if connected
+                if (peerConnection && peerConnection.connectionState === 'connected') {
+                    optimizeWebRTCQuality();
+                }
+
+                showTemporaryStatus(`WebRTC quality set to ${preset.toUpperCase()}`);
+            }
         }
 
         // Handle window resize to maintain aspect ratio

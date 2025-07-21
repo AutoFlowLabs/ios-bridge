@@ -21,6 +21,9 @@ import av
 from fractions import Fraction
 from threading import Event
 import uuid
+import threading
+from queue import Queue
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,8 +47,13 @@ point_dimensions_cache = None
 webrtc_connections = {}
 webrtc_video_source = None
 webrtc_active = False
-webrtc_frame_event = Event()
+webrtc_frame_queue = Queue(maxsize=2)  # Small buffer for low latency
 webrtc_current_frame = None
+webrtc_frame_lock = threading.Lock()
+webrtc_frame_event = Event() 
+webrtc_frame_thread = None   
+webrtc_quality_settings = {"fps": 60, "resolution_scale": 2, "quality": 95}
+
 
 
 def cleanup_processes():
@@ -498,34 +506,48 @@ async def get_point_dimensions():
     point_dimensions_cache = (390, 844)
     return point_dimensions_cache
 
+
 class SimulatorVideoTrack(VideoStreamTrack):
-    """Custom video track for iOS Simulator"""
+    """Enhanced video track for iOS Simulator with high quality"""
     
-    def __init__(self):
+    def __init__(self, target_fps=60):
         super().__init__()
         self.frame_count = 0
+        self.target_fps = target_fps
+        self.frame_time = 1.0 / target_fps
+        self.last_frame_time = time.time()
         
     async def recv(self):
-        """Generate video frames for WebRTC"""
+        """Generate high-quality video frames for WebRTC"""
         global webrtc_current_frame
         
-        # Wait for a new frame
-        webrtc_frame_event.wait(timeout=0.05)
+        # Frame timing for consistent FPS
+        current_time = time.time()
+        elapsed = current_time - self.last_frame_time
         
-        if webrtc_current_frame is None:
-            # Generate a placeholder frame if no screenshot available
-            frame = av.VideoFrame.from_ndarray(
-                np.zeros((844, 390, 3), dtype=np.uint8), 
-                format='rgb24'
-            )
-        else:
-            frame = webrtc_current_frame
-            
+        if elapsed < self.frame_time:
+            await asyncio.sleep(self.frame_time - elapsed)
+        
+        with webrtc_frame_lock:
+            if webrtc_current_frame is None:
+                # Generate a high-quality placeholder frame
+                frame = av.VideoFrame.from_ndarray(
+                    np.zeros((844, 390, 3), dtype=np.uint8), 
+                    format='rgb24'
+                )
+            else:
+                # Create a new frame from the same data instead of copying
+                frame_array = webrtc_current_frame.to_ndarray(format='rgb24')
+                frame = av.VideoFrame.from_ndarray(frame_array, format='rgb24')
+        
+        # Set precise timing
         frame.pts = self.frame_count
-        frame.time_base = Fraction(1, 30)  # 30 FPS
+        frame.time_base = Fraction(1, self.target_fps)
         self.frame_count += 1
+        self.last_frame_time = time.time()
         
         return frame
+    
 
 def webrtc_frame_producer():
     """Continuously capture frames for WebRTC"""
@@ -550,10 +572,11 @@ def webrtc_frame_producer():
                     img = img.resize((390, 844), Image.Resampling.LANCZOS)
                     img_array = np.array(img)
                 
-                # Create AV frame
-                webrtc_current_frame = av.VideoFrame.from_ndarray(img_array, format='rgb24')
-                webrtc_frame_event.set()
-                webrtc_frame_event.clear()
+                # Create AV frame with thread safety
+                new_frame = av.VideoFrame.from_ndarray(img_array, format='rgb24')
+                
+                with webrtc_frame_lock:
+                    webrtc_current_frame = new_frame
             
             time.sleep(1/30)  # 30 FPS target
             
@@ -561,8 +584,134 @@ def webrtc_frame_producer():
             logger.error(f"WebRTC frame producer error: {e}")
             time.sleep(0.1)
 
-def start_webrtc_capture():
-    """Start WebRTC video capture"""
+            
+def webrtc_high_quality_frame_producer():
+    """High-quality, high-FPS frame producer for WebRTC"""
+    global webrtc_current_frame, webrtc_active
+    
+    logger.info("Starting high-quality WebRTC frame producer...")
+    
+    target_fps = 60
+    frame_interval = 1.0 / target_fps
+    last_capture = 0
+    frame_count = 0
+    
+    # Performance tracking
+    capture_times = []
+    processing_times = []
+    
+    while webrtc_active:
+        frame_start = time.time()
+        
+        if frame_start - last_capture >= frame_interval:
+            try:
+                capture_start = time.time()
+                
+                # Use optimized screenshot method
+                screenshot_data = capture_optimized_screenshot_for_webrtc()
+                
+                capture_time = time.time() - capture_start
+                capture_times.append(capture_time)
+                if len(capture_times) > 100:
+                    capture_times.pop(0)
+                
+                if screenshot_data:
+                    processing_start = time.time()
+                    
+                    # Decode base64 image
+                    image_bytes = base64.b64decode(screenshot_data["data"])
+                    
+                    # High-quality image processing
+                    with Image.open(io.BytesIO(image_bytes)) as img:
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        
+                        # High-quality resize with optimal dimensions
+                        target_width = 390 * 2  # 2x resolution for better quality
+                        target_height = 844 * 2
+                        
+                        # Use high-quality resampling
+                        img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                        img_array = np.array(img, dtype=np.uint8)
+                        
+                        # Ensure proper color space
+                        if img_array.shape[2] == 4:  # RGBA
+                            img_array = img_array[:, :, :3]  # Convert to RGB
+                    
+                    # Create high-quality AV frame with thread safety
+                    new_frame = av.VideoFrame.from_ndarray(img_array, format='rgb24')
+                    
+                    with webrtc_frame_lock:
+                        webrtc_current_frame = new_frame
+                    
+                    processing_time = time.time() - processing_start
+                    processing_times.append(processing_time)
+                    if len(processing_times) > 100:
+                        processing_times.pop(0)
+                    
+                    frame_count += 1
+                    
+                    # Log performance every 5 seconds
+                    if frame_count % 300 == 0:
+                        avg_capture = sum(capture_times) / len(capture_times) * 1000
+                        avg_processing = sum(processing_times) / len(processing_times) * 1000
+                        logger.info(f"WebRTC: {target_fps}fps target, avg capture: {avg_capture:.1f}ms, avg processing: {avg_processing:.1f}ms")
+                    
+                last_capture = frame_start
+                
+            except Exception as e:
+                logger.error(f"WebRTC frame producer error: {e}")
+                time.sleep(0.01)
+        else:
+            # Precise timing with minimal sleep
+            sleep_time = frame_interval - (time.time() - last_capture)
+            if sleep_time > 0.001:  # Only sleep if meaningful time remaining
+                time.sleep(min(sleep_time, 0.01))
+
+def capture_optimized_screenshot_for_webrtc():
+    """Ultra-optimized screenshot capture specifically for WebRTC"""
+    try:
+        # Try different capture methods for best quality/speed
+        
+        # Method 1: Direct idb with optimized settings
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+            cmd = ["idb", "screenshot", "--udid", UDID, temp_file.name]
+            result = subprocess.run(cmd, capture_output=True, timeout=0.3)
+            
+            if result.returncode == 0 and os.path.exists(temp_file.name):
+                with Image.open(temp_file.name) as img:
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # High-quality PNG to JPEG conversion
+                    output = io.BytesIO()
+                    
+                    # Use maximum quality for WebRTC
+                    img.save(output, format='JPEG', 
+                           quality=95,      # High quality
+                           optimize=True,   # Optimize file size
+                           progressive=True, # Progressive JPEG
+                           subsampling=0)   # No chroma subsampling for best quality
+                    
+                    image_data = output.getvalue()
+                
+                os.unlink(temp_file.name)
+                
+                return {
+                    "data": base64.b64encode(image_data).decode('utf-8'),
+                    "pixel_width": img.width,
+                    "pixel_height": img.height
+                }
+                
+    except subprocess.TimeoutExpired:
+        pass
+    except Exception as e:
+        logger.debug(f"Screenshot error: {e}")
+    
+    return None
+
+def start_webrtc_capture(fps=60):
+    """Start high-quality WebRTC video capture"""
     global webrtc_active, webrtc_frame_thread
     
     if webrtc_active:
@@ -570,13 +719,17 @@ def start_webrtc_capture():
     
     try:
         webrtc_active = True
-        webrtc_frame_thread = threading.Thread(target=webrtc_frame_producer, daemon=True)
+        webrtc_frame_thread = threading.Thread(
+            target=webrtc_high_quality_frame_producer, 
+            daemon=True
+        )
         webrtc_frame_thread.start()
-        logger.info("✅ WebRTC capture started")
+        logger.info(f"✅ High-quality WebRTC capture started at {fps}fps")
         return True
     except Exception as e:
         logger.error(f"❌ WebRTC capture failed: {e}")
         return False
+    
 
 def stop_webrtc_capture():
     """Stop WebRTC video capture"""
@@ -585,10 +738,16 @@ def stop_webrtc_capture():
     webrtc_active = False
     webrtc_current_frame = None
     
-    # Close all WebRTC connections
-    for pc in list(webrtc_connections.values()):
-        asyncio.create_task(pc.close())
-    webrtc_connections.clear()
+    # Close all WebRTC connections safely
+    connections_to_close = list(webrtc_connections.items())
+    webrtc_connections.clear()  # Clear first to prevent race conditions
+    
+    for connection_id, pc in connections_to_close:
+        try:
+            asyncio.create_task(pc.close())
+            logger.debug(f"Closed WebRTC connection: {connection_id}")
+        except Exception as e:
+            logger.debug(f"Error closing WebRTC connection {connection_id}: {e}")
 
 
 @app.websocket("/ws/control")
@@ -820,36 +979,49 @@ async def webrtc_signaling(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebRTC signaling error: {e}")
     finally:
-        # Clean up connection
+        # Clean up connection with safe deletion
         if connection_id in webrtc_connections:
-            await webrtc_connections[connection_id].close()
-            del webrtc_connections[connection_id]
-        
+            try:
+                await webrtc_connections[connection_id].close()
+            except Exception as e:
+                logger.debug(f"Error closing WebRTC connection: {e}")
+            finally:
+                try:
+                    del webrtc_connections[connection_id]
+                except KeyError:
+                    logger.debug(f"WebRTC connection already removed: {connection_id}")
+
         logger.info(f"WebRTC signaling disconnected: {connection_id}")
         
         # Stop capture if no more connections
         if not webrtc_connections:
             stop_webrtc_capture()
 
+
 async def handle_webrtc_message(websocket: WebSocket, connection_id: str, data: dict):
-    """Handle WebRTC signaling messages"""
+    """Handle WebRTC signaling messages with quality optimization"""
     message_type = data.get("type")
     
     if message_type == "offer":
-        # Create RTCPeerConnection
+        # Create RTCPeerConnection with correct configuration format
         pc = RTCPeerConnection()
         webrtc_connections[connection_id] = pc
         
-        # Add video track
-        video_track = SimulatorVideoTrack()
+        # Add high-quality video track
+        video_track = SimulatorVideoTrack(target_fps=60)
         pc.addTrack(video_track)
         
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
             logger.info(f"WebRTC connection state: {pc.connectionState}")
             if pc.connectionState in ["failed", "closed"]:
+                # Safe deletion - check if connection still exists
                 if connection_id in webrtc_connections:
-                    del webrtc_connections[connection_id]
+                    try:
+                        del webrtc_connections[connection_id]
+                        logger.info(f"Removed failed WebRTC connection: {connection_id}")
+                    except KeyError:
+                        pass  # Already removed
         
         # Set remote description
         await pc.setRemoteDescription(RTCSessionDescription(
@@ -868,12 +1040,37 @@ async def handle_webrtc_message(websocket: WebSocket, connection_id: str, data: 
         }))
         
     elif message_type == "ice-candidate":
-        # Handle ICE candidate
         if connection_id in webrtc_connections:
             pc = webrtc_connections[connection_id]
-            candidate = data.get("candidate")
-            if candidate:
+            candidate_data = data.get("candidate")
+            if candidate_data:
+                from aiortc import RTCIceCandidate
+                candidate = RTCIceCandidate(
+                    candidate=candidate_data.get("candidate"),
+                    sdpMid=candidate_data.get("sdpMid"),
+                    sdpMLineIndex=candidate_data.get("sdpMLineIndex")
+                )
                 await pc.addIceCandidate(candidate)
+
+
+@app.get("/webrtc/quality/{quality}")
+async def set_webrtc_quality(quality: str):
+    """Set WebRTC quality preset"""
+    global webrtc_quality_settings
+    
+    presets = {
+        "low": {"fps": 30, "resolution_scale": 1, "quality": 70},
+        "medium": {"fps": 45, "resolution_scale": 1.5, "quality": 85},
+        "high": {"fps": 60, "resolution_scale": 2, "quality": 95},
+        "ultra": {"fps": 60, "resolution_scale": 2.5, "quality": 98}
+    }
+    
+    if quality in presets:
+        webrtc_quality_settings = presets[quality]
+        logger.info(f"WebRTC quality set to: {quality}")
+        return {"success": True, "quality": quality, "settings": presets[quality]}
+    else:
+        return {"success": False, "error": "Invalid quality preset"}
 
 @app.get("/")
 def index():
