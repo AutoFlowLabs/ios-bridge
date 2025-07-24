@@ -55,86 +55,146 @@ class UltraMaxQualityVideoTrack(VideoStreamTrack):
     # Replace the UltraMaxQualityVideoTrack.recv method with this anti-lag version:
 
     async def recv(self):
-        """Ultra-low latency frame delivery with aggressive optimization"""
+        """Simplified stable frame delivery"""
         current_time = time.time()
         
-        # ✅ MINIMAL rate limiting for real-time feel
-        min_frame_interval = 1.0 / min(60, self.target_fps)  # Cap at 60fps for browser compatibility
+        # Simple rate limiting
+        min_frame_interval = 1.0 / 30
         if current_time - self.last_frame_time < min_frame_interval:
             sleep_time = min_frame_interval - (current_time - self.last_frame_time)
-            if sleep_time > 0.001:  # Only sleep if > 1ms
-                await asyncio.sleep(min(sleep_time, 0.016))  # Max 16ms (60fps)
+            if sleep_time > 0.001:
+                await asyncio.sleep(min(sleep_time, 0.033))
         
         try:
-            # ✅ GET FRESHEST FRAME: Always get the most recent
+            # ✅ SIMPLE: Just get the latest frame without complex validation
             av_frame = None
             
-            # Try to get the absolute latest frame
             with self.webrtc_service.frame_lock:
-                # Priority 1: Current frame (most recent)
                 if self.webrtc_service.current_frame is not None:
                     av_frame = self.webrtc_service.current_frame
-                # Priority 2: Last frame in queue
                 elif self.webrtc_service.frame_queue:
                     av_frame = self.webrtc_service.frame_queue[-1]
             
-            # Fallback handling
+            # ✅ FALLBACK: Only if absolutely no frame
             if av_frame is None:
                 if self.last_valid_frame is not None:
-                    logger.debug("Using last valid frame as fallback")
-                    av_frame = self.last_valid_frame
-                else:
-                    logger.warning("No frames available, creating black frame")
-                    av_frame = self._create_black_frame()
-            
-            # ✅ FAST validation and processing
-            if not self._is_frame_valid(av_frame):
-                logger.warning("Invalid frame detected, using fallback")
-                if self.last_valid_frame is not None:
                     av_frame = self.last_valid_frame
                 else:
                     av_frame = self._create_black_frame()
             
-            # ✅ MINIMAL format conversion
+            # ✅ SIMPLE: Basic format check only
             try:
                 if av_frame.format.name != 'yuv420p':
-                    # Fast conversion without quality loss
                     av_frame = av_frame.reformat(format='yuv420p')
-                
-                # Quick plane validation
-                if not hasattr(av_frame, 'planes') or len(av_frame.planes) != 3:
-                    raise ValueError("Frame missing YUV planes")
-                
-                # Store as last valid frame
-                self.last_valid_frame = av_frame
-                
-            except Exception as conversion_error:
-                logger.error(f"Frame conversion error: {conversion_error}")
+            except Exception as convert_error:
+                logger.debug(f"Format conversion failed: {convert_error}")
+                # Use original frame or fallback
                 if self.last_valid_frame is not None:
                     av_frame = self.last_valid_frame
                 else:
                     av_frame = self._create_black_frame()
             
-            # ✅ PRECISE timing for smooth playback
+            # ✅ SIMPLE: Set timing
             self.frame_count += 1
-            av_frame.pts = self.frame_count
-            av_frame.time_base = Fraction(1, min(60, self.target_fps))  # Browser-compatible timing
+            try:
+                av_frame.pts = self.frame_count
+                av_frame.time_base = Fraction(1, 30)
+            except:
+                pass  # Ignore timing errors
+            
+            # Store as last valid frame
+            if av_frame and hasattr(av_frame, 'width') and av_frame.width > 0:
+                self.last_valid_frame = av_frame
             
             self.last_frame_time = current_time
             
-            # Minimal logging
-            if self.frame_count % 120 == 0:  # Log every 2 seconds at 60fps
-                logger.debug(f"📊 Sent frame {self.frame_count} for connection {self.connection_id}")
+            if self.frame_count % 150 == 0:
+                logger.debug(f"📊 Frame {self.frame_count} delivered")
             
             return av_frame
             
         except Exception as e:
-            logger.error(f"❌ Error in recv() for connection {self.connection_id}: {e}")
+            logger.error(f"❌ Error in recv(): {e}")
+            # Emergency fallback
             if self.last_valid_frame is not None:
                 return self.last_valid_frame
             else:
                 return self._create_black_frame()
+
+    def _create_black_frame(self):
+        """Create a simple black frame - FIXED VERSION"""
+        try:
+            # Use actual device resolution from the stream
+            width, height = 390, 844  # Standard iPhone size
             
+            # ✅ FIXED: Create frame properly with numpy
+            import numpy as np
+            
+            # Create YUV420p black frame
+            # Y plane (luminance) - full resolution
+            y_plane = np.zeros((height, width), dtype=np.uint8)
+            
+            # U and V planes (chrominance) - quarter resolution for 420p
+            uv_height = height // 2
+            uv_width = width // 2
+            u_plane = np.full((uv_height, uv_width), 128, dtype=np.uint8)
+            v_plane = np.full((uv_height, uv_width), 128, dtype=np.uint8)
+            
+            # Create frame
+            frame = av.VideoFrame(width=width, height=height, format='yuv420p')
+            
+            # Update planes
+            frame.planes[0].update(y_plane)
+            frame.planes[1].update(u_plane)
+            frame.planes[2].update(v_plane)
+            
+            # Set timing
+            frame.pts = self.frame_count
+            frame.time_base = Fraction(1, 30)
+            
+            return frame
+            
+        except Exception as e:
+            logger.error(f"Black frame creation error: {e}")
+            # Absolute emergency fallback
+            try:
+                return av.VideoFrame(width=390, height=844, format='yuv420p')
+            except:
+                # This should never happen, but create minimal frame
+                frame = av.VideoFrame(width=320, height=240, format='yuv420p')
+                return frame
+
+
+    def _is_frame_fresh(self, frame) -> bool:
+        """Check if frame is recent enough"""
+        try:
+            if not hasattr(frame, 'pts') or frame.pts is None:
+                return True  # Assume fresh if no timing info
+            
+            current_pts = self.frame_count
+            frame_age = current_pts - frame.pts if frame.pts else 0
+            
+            # Consider frame fresh if less than 5 frames old
+            return frame_age < 5
+            
+        except Exception:
+            return True  # Assume fresh on error
+
+ 
+    def _safe_frame_copy(self, source_frame):
+        """Create a safe copy of frame"""
+        try:
+            # Simple reference copy for performance
+            return source_frame
+        except Exception:
+            return source_frame
+
+            
+        except Exception as e:
+            logger.error(f"Failed to create stable fallback frame: {e}")
+            # Absolute fallback
+            return av.VideoFrame(width=390, height=844, format='yuv420p')
+          
     def clear_frame_buffers(self):
         """Clear frame buffers to eliminate lag after actions"""
         try:
@@ -196,33 +256,7 @@ class UltraMaxQualityVideoTrack(VideoStreamTrack):
             
         except Exception:
             return False
-    
-    def _create_black_frame(self):
-        """Create a black frame as fallback"""
-        try:
-            import av
-            
-            # Create a black frame with standard iPhone resolution
-            width, height = 1170, 2532
-            
-            # Create black frame in YUV420P format
-            frame = av.VideoFrame.from_ndarray(
-                np.zeros((height, width, 3), dtype=np.uint8),
-                format='rgb24'
-            )
-            
-            # Convert to YUV420P
-            frame = frame.reformat(format='yuv420p')
-            frame.pts = self.frame_count
-            frame.time_base = Fraction(1, self.target_fps)
-            
-            return frame
-            
-        except Exception as e:
-            logger.error(f"Failed to create black frame: {e}")
-            # This should never happen, but just in case
-            raise RuntimeError("Cannot create fallback frame")
-    
+
     async def _get_ultra_optimized_frame(self):
         """Get frame with advanced caching and format optimization"""
         service = self.webrtc_service()
@@ -413,9 +447,8 @@ class UltraMaxQualityWebRTCService:
         self.udid = udid
         logger.info(f"WebRTC service UDID set to: {udid}")
     
-
     def start_video_stream(self) -> bool:
-        """Start video streaming with enhanced error handling"""
+        """Start video streaming with stability optimizations"""
         if not self.udid:
             logger.error("No UDID set for video stream")
             return False
@@ -425,79 +458,70 @@ class UltraMaxQualityWebRTCService:
                 logger.info("Stream already active")
                 return True
             
-            # ✅ Clean up any existing process first
             self._cleanup_video_process()
             
             try:
-                # Simple idb command - exactly like the working test
+                # ✅ STABLE configuration
                 cmd = [
                     "idb", "video-stream",
                     "--udid", self.udid,
                     "--format", "h264",
-                    "--fps", "30"  # ✅ Use 30fps like the working test
+                    "--fps", "30"  # Stable 30fps
                 ]
                 
-                logger.info(f"🚀 Starting idb stream: {' '.join(cmd)}")
+                logger.info(f"🚀 Starting stable stream: {' '.join(cmd)}")
                 
-                # ✅ Start process with better error handling
                 self.video_stream_process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    bufsize=0
+                    bufsize=65536  # Larger buffer for stability
                 )
                 
                 if not self.video_stream_process:
                     logger.error("❌ Failed to create subprocess")
                     return False
                 
-                logger.info(f"✅ Process created with PID: {self.video_stream_process.pid}")
+                # Extended validation period
+                time.sleep(0.8)  # Longer startup time
                 
-                # ✅ Validate process startup
-                startup_delay = 0.5
-                time.sleep(startup_delay)
+                process_status = self.video_stream_process.poll()
+                if process_status is not None:
+                    stderr_data = ""
+                    try:
+                        stderr_data = self.video_stream_process.stderr.read().decode()
+                    except:
+                        pass
+                    logger.error(f"❌ Stream failed (code {process_status}): {stderr_data}")
+                    self.video_stream_process = None
+                    return False
                 
-                try:
-                    process_status = self.video_stream_process.poll()
-                    if process_status is not None:
-                        # Process died immediately
-                        stderr_data = ""
-                        try:
-                            stderr_data = self.video_stream_process.stderr.read().decode()
-                        except:
-                            pass
-                        logger.error(f"❌ idb stream failed immediately (code {process_status}): {stderr_data}")
-                        self.video_stream_process = None
-                        return False
-                    
-                    # ✅ Check if stdout is available
-                    if not self.video_stream_process.stdout:
-                        logger.error("❌ No stdout available from idb process")
-                        self._cleanup_video_process()
-                        return False
-                    
-                    # ✅ Set stream as active BEFORE starting frame producer
-                    self.stream_active = True
-                    self.webrtc_active = True
-                    
-                    logger.info(f"✅ idb stream validated, starting frame producer...")
-                    
-                    # Start frame producer
-                    self._start_ultra_frame_producer()
-                    
-                    logger.info(f"✅ idb stream started successfully for {self.udid}")
-                    return True
-                    
-                except Exception as validation_error:
-                    logger.error(f"❌ Process validation failed: {validation_error}")
+                if not self.video_stream_process.stdout:
+                    logger.error("❌ No stdout available")
                     self._cleanup_video_process()
                     return False
-                    
+                
+                self.stream_active = True
+                self.webrtc_active = True
+                
+                # Start frame producer with delay
+                logger.info("🎬 Starting frame producer...")
+                success = self._start_ultra_frame_producer()
+                
+                if not success:
+                    logger.error("❌ Failed to start frame producer")
+                    self._cleanup_video_process()
+                    return False
+                
+                logger.info(f"✅ Stable stream started for {self.udid}")
+                return True
+                
             except Exception as e:
                 logger.error(f"❌ Failed to start stream: {e}")
                 self._cleanup_video_process()
                 return False
-    
+            
+
     def _cleanup_video_process(self):
         """Clean up video stream process safely"""
         try:
@@ -587,98 +611,57 @@ class UltraMaxQualityWebRTCService:
             logger.error(f"❌ Failed to start frame producer: {e}")
             return False
 
-
     def _ultra_max_quality_frame_producer(self):
-        """Enhanced frame producer with anti-lag optimizations"""
+        """Simplified frame producer without complex validation"""
         logger.info(f"🚀 Frame producer starting for {self.udid}")
         
         frame_count = 0
         start_time = time.time()
-        corrupted_frames = 0
-        dropped_frames = 0
-        last_action_time = time.time()
+        last_log_time = time.time()
         
         try:
-            # Validation and container setup
+            time.sleep(0.3)
+            
             if not self.video_stream_process:
-                logger.error("❌ No video stream process found")
+                logger.error("❌ No video process")
                 return
             
-            time.sleep(0.2)
-            
-            try:
-                process_status = self.video_stream_process.poll()
-                if process_status is not None:
-                    stderr_data = ""
-                    try:
-                        if self.video_stream_process.stderr:
-                            stderr_data = self.video_stream_process.stderr.read().decode()
-                    except:
-                        pass
-                    logger.error(f"❌ Process died with code {process_status}: {stderr_data}")
-                    return
-            except AttributeError:
-                logger.error("❌ Video stream process became None during startup")
+            if self.video_stream_process.poll() is not None:
+                logger.error("❌ Process died")
                 return
             
-            logger.info("📡 Opening video container...")
+            logger.info("📡 Opening container...")
             
-            try:
-                if not self.video_stream_process.stdout:
-                    logger.error("❌ No stdout available from process")
-                    return
-                
-                container = av.open(self.video_stream_process.stdout, 'r', format='h264')
-                
-            except Exception as container_error:
-                logger.error(f"❌ Failed to open container: {container_error}")
-                return
-            
-            logger.info(f"✅ Container opened successfully")
-            logger.info(f"Video streams: {len(container.streams.video)}")
+            container = av.open(
+                self.video_stream_process.stdout, 
+                'r', 
+                format='h264'
+            )
             
             if not container.streams.video:
-                logger.error("❌ No video streams found")
+                logger.error("❌ No video streams")
                 return
             
             stream = container.streams.video[0]
-            logger.info(f"Stream info: {stream}")
+            logger.info(f"Stream: {stream.width}x{stream.height}")
             
-            logger.info("🎬 Starting frame processing...")
-            
-            last_log_time = time.time()
-            
-            # ✅ ANTI-LAG processing loop
+            # ✅ SIMPLE processing loop
             for packet in container.demux(stream):
                 if not self.stream_active:
-                    logger.info("🛑 Stream stopping")
                     break
-                
-                # Check process health
-                if frame_count % 30 == 0:
-                    try:
-                        if not self.video_stream_process or self.video_stream_process.poll() is not None:
-                            logger.error("❌ Video stream process died during processing")
-                            break
-                    except AttributeError:
-                        logger.error("❌ Video stream process became None during processing")
-                        break
                 
                 try:
                     for frame in packet.decode():
-                        # ✅ VALIDATE frame before processing
-                        if not self._validate_frame_integrity(frame):
-                            corrupted_frames += 1
-                            if corrupted_frames % 10 == 0:
-                                logger.warning(f"⚠️ Skipped {corrupted_frames} corrupted frames")
-                            continue
-                        
                         frame_count += 1
                         current_time = time.time()
                         
-                        # ✅ CRITICAL: Anti-lag frame management
+                        # ✅ MINIMAL validation - just check if frame exists
+                        if not frame or not hasattr(frame, 'width'):
+                            continue
+                        
+                        # ✅ SIMPLE processing
                         try:
-                            # Ensure proper format
+                            # Convert format if needed
                             if frame.format.name != 'yuv420p':
                                 frame = frame.reformat(format='yuv420p')
                             
@@ -686,67 +669,86 @@ class UltraMaxQualityWebRTCService:
                             frame.pts = frame_count
                             frame.time_base = Fraction(1, 30)
                             
-                            # ✅ SMART BUFFERING: Aggressive queue management
-                            with self.frame_lock:
-                                # Check if we should drop frames (queue getting full)
-                                queue_size = len(self.frame_queue)
-                                
-                                if queue_size >= 3:  # ✅ Much smaller buffer
-                                    # Drop oldest frames aggressively
-                                    frames_to_drop = queue_size - 1  # Keep only 1 frame
-                                    for _ in range(frames_to_drop):
-                                        if self.frame_queue:
-                                            self.frame_queue.popleft()
-                                            dropped_frames += 1
-                                
-                                # Always update current frame (most recent)
-                                self.current_frame = frame
-                                
-                                # Add to queue only if there's space
-                                if len(self.frame_queue) < 2:  # ✅ Very small queue
-                                    self.frame_queue.append(frame)
-                                else:
-                                    # Replace the newest frame in queue
-                                    if self.frame_queue:
-                                        self.frame_queue.pop()  # Remove newest
-                                    self.frame_queue.append(frame)
-                                    dropped_frames += 1
-                            
-                        except Exception as frame_process_error:
-                            logger.warning(f"Frame processing error: {frame_process_error}")
+                        except Exception as process_error:
+                            logger.debug(f"Frame processing error: {process_error}")
                             continue
                         
-                        # Progress logging with drop info
-                        if current_time - last_log_time > 2.0 or frame_count <= 10:
+                        # ✅ SIMPLE frame storage
+                        try:
+                            with self.frame_lock:
+                                self.current_frame = frame
+                                
+                                # Keep small queue
+                                if len(self.frame_queue) >= 2:
+                                    self.frame_queue.popleft()
+                                
+                                self.frame_queue.append(frame)
+                        except Exception as storage_error:
+                            logger.debug(f"Frame storage error: {storage_error}")
+                            continue
+                        
+                        # Logging
+                        if current_time - last_log_time > 3.0:
                             elapsed = current_time - start_time
                             fps = frame_count / elapsed if elapsed > 0 else 0
-                            logger.info(f"✅ Frame {frame_count}: {frame.width}x{frame.height}, {fps:.1f}fps (corrupted: {corrupted_frames}, dropped: {dropped_frames})")
+                            logger.info(f"📊 Frame {frame_count}: {frame.width}x{frame.height}, {fps:.1f}fps")
                             last_log_time = current_time
+                            
+                            # Log first frame immediately
+                            if frame_count == 1:
+                                logger.info(f"🎯 FIRST FRAME: {frame.width}x{frame.height}")
                         
-                        # ✅ MINIMAL SLEEP: Only yield occasionally
-                        if frame_count % 60 == 0:
-                            time.sleep(0.0001)  # Extremely minimal sleep
-                
+                        # Minimal sleep
+                        if frame_count % 30 == 0:
+                            time.sleep(0.001)
+                            
                 except Exception as decode_error:
-                    logger.warning(f"Packet decode error: {decode_error}")
+                    logger.debug(f"Decode error: {decode_error}")
                     continue
-        
+                    
         except Exception as e:
             logger.error(f"❌ Frame producer error: {e}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-        
         finally:
             try:
                 if 'container' in locals():
                     container.close()
-                    logger.info("📦 Container closed")
             except:
                 pass
             
             elapsed = time.time() - start_time
             avg_fps = frame_count / elapsed if elapsed > 0 else 0
-            logger.info(f"🏁 Frame producer stopped. {frame_count} frames, {avg_fps:.1f}fps, {corrupted_frames} corrupted, {dropped_frames} dropped")
+            logger.info(f"🏁 Producer ended: {frame_count} frames, {avg_fps:.1f}fps")
+
+
+
+    def _basic_frame_validation(self, frame) -> bool:
+        """Quick frame validation"""
+        try:
+            return (frame and 
+                    hasattr(frame, 'width') and hasattr(frame, 'height') and
+                    frame.width > 0 and frame.height > 0 and
+                    frame.width <= 4000 and frame.height <= 4000 and
+                    hasattr(frame, 'format'))
+        except:
+            return False
+
+    def _quick_frame_process(self, frame, frame_count):
+        """Quick frame processing"""
+        try:
+            # Minimal processing for speed
+            if frame.format.name != 'yuv420p':
+                frame = frame.reformat(format='yuv420p')
+            
+            frame.pts = frame_count
+            frame.time_base = Fraction(1, 30)
+            
+            return frame
+        except Exception as e:
+            logger.debug(f"Frame process error: {e}")
+            return None
+
+    
+   
     def _validate_frame_integrity(self, frame) -> bool:
         """Validate frame integrity to prevent corruption"""
         try:
@@ -799,18 +801,16 @@ class UltraMaxQualityWebRTCService:
             return None
     
     def get_latest_frame(self):
-        """Get the latest frame with ultra-minimal latency"""
+        """Simple frame getter"""
         try:
             with self.frame_lock:
-                if self.current_frame:
+                if self.current_frame is not None:
                     return self.current_frame
                 elif self.frame_queue:
                     return self.frame_queue[-1]
                 return None
-        except Exception as e:
-            logger.debug(f"Get latest frame error: {e}")
+        except Exception:
             return None
-    
 
     async def create_peer_connection(self) -> Tuple[str, RTCPeerConnection]:
         """Create peer connection with minimal configuration"""

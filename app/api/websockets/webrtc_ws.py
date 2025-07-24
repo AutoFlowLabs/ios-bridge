@@ -148,172 +148,70 @@ class WebRTCWebSocket:
                 "error": str(e),
                 "code": f"{message_type.upper()}_ERROR"
             }))
-    
 
     async def _handle_offer(self, websocket: WebSocket, websocket_id: str, data: dict):
-        """Handle WebRTC offer with ultra-optimized connection setup"""
+        """Simplified offer handler"""
         connection_id = None
         try:
             logger.info(f"🔧 Creating peer connection for {websocket_id}")
             
-            # ✅ ENHANCED FRAME AVAILABILITY CHECK
-            frame_available = self.webrtc_service.get_latest_frame() is not None
-            if not frame_available:
-                logger.warning("⚠️ No frames available yet, ensuring stream is properly started...")
+            # ✅ SIMPLE: Just check if we have any frame
+            def has_frames():
+                frame = self.webrtc_service.get_latest_frame()
+                return frame is not None
+            
+            # ✅ SHORT wait if no frames
+            if not has_frames():
+                logger.info("⏳ Waiting briefly for frames...")
                 
-                # Force restart the stream if it's not producing frames
-                if self.webrtc_service.stream_active:
-                    logger.info("🔄 Restarting stream to ensure frame production...")
-                    
-                    # ✅ FIXED: Always call both stop and start, don't chain them
-                    stop_result = self.webrtc_service.stop_video_stream()
-                    logger.info(f"🛑 Stop result: {stop_result}")
-                    
-                    # Wait a moment for cleanup
-                    await asyncio.sleep(0.5)
-                    
-                    start_result = self.webrtc_service.start_video_stream()
-                    logger.info(f"🚀 Start result: {start_result}")
-                    
-                    if not start_result:  # ✅ FIXED: Only check start_result
-                        await websocket.send_text(json.dumps({
-                            "type": "error",
-                            "error": "Failed to restart video stream",
-                            "code": "STREAM_RESTART_FAILED",
-                            "suggestion": "Check device connection and try again"
-                        }))
-                        return
-                else:
-                    # Stream not active, just start it
-                    logger.info("🚀 Starting stream for frame production...")
-                    start_result = self.webrtc_service.start_video_stream()
-                    logger.info(f"🚀 Start result: {start_result}")
-                    
-                    if not start_result:
-                        await websocket.send_text(json.dumps({
-                            "type": "error",
-                            "error": "Failed to start video stream",
-                            "code": "STREAM_START_FAILED",
-                            "suggestion": "Check device connection and try again"
-                        }))
-                        return
-                
-                # Extended wait with more frequent checks
-                logger.info("⏳ Waiting for frames to become available...")
-                for i in range(60):  # Wait up to 6 seconds
+                for i in range(30):  # 3 seconds max
                     await asyncio.sleep(0.1)
-                    current_frame = self.webrtc_service.get_latest_frame()
-                    if current_frame is not None:
-                        logger.info(f"✅ Frames became available after {(i+1)*100}ms")
+                    if has_frames():
+                        logger.info(f"✅ Frames available after {(i+1)*100}ms")
                         break
-                    
-                    # Log progress every second
-                    if (i + 1) % 10 == 0:
-                        seconds = (i + 1) / 10
-                        logger.info(f"⏳ Still waiting for frames... ({seconds}s)")
-                        
-                        # Check if stream is still active
-                        if not self.webrtc_service.stream_active:
-                            logger.error("❌ Stream became inactive while waiting for frames")
-                            await websocket.send_text(json.dumps({
-                                "type": "error",
-                                "error": "Video stream stopped unexpectedly",
-                                "code": "STREAM_STOPPED_UNEXPECTEDLY"
-                            }))
-                            return
                 else:
-                    # Simple fallback - no frames after waiting
-                    logger.error("❌ No frames available after 6 seconds")
-                    await websocket.send_text(json.dumps({
-                        "type": "error",
-                        "error": "Video stream not producing frames",
-                        "code": "NO_FRAMES_AVAILABLE",
-                        "suggestion": "Check device connection and restart"
-                    }))
-                    return
-            else:
-                logger.info("✅ Frames are already available")
+                    logger.warning("⚠️ No frames after 3s, proceeding anyway")
             
-            # Double-check frame availability before proceeding
-            final_frame_check = self.webrtc_service.get_latest_frame()
-            if final_frame_check is None:
-                logger.error("❌ Final frame check failed - no frames available")
-                await websocket.send_text(json.dumps({
-                    "type": "error",
-                    "error": "No frames available for WebRTC connection",
-                    "code": "FINAL_FRAME_CHECK_FAILED"
-                }))
-                return
-            
-            logger.info("✅ Frame availability confirmed, proceeding with WebRTC connection")
-            
-            # Create new peer connection with ultra-low latency optimization
+            # ✅ CREATE connection regardless
+            logger.info("🔗 Creating peer connection...")
             connection_id, pc = await self.webrtc_service.create_peer_connection()
-            logger.info(f"✅ Created peer connection: {connection_id}")
-            
-            # Map websocket to connection for cleanup
             self.active_connections[websocket_id] = connection_id
             
-            # ✅ FIX: Extract offer data properly with validation
+            # ✅ HANDLE offer
             offer_sdp = data.get("sdp")
-            offer_type = data.get("type", "offer")
-            
             if not offer_sdp:
-                raise ValueError("Missing SDP in offer")
+                raise ValueError("Missing SDP")
             
-            logger.info(f"📋 Processing offer SDP (length: {len(offer_sdp)} chars)")
-            
-            offer_data = {
+            answer = await self.webrtc_service.handle_offer(pc, {
                 "sdp": offer_sdp,
-                "type": offer_type
-            }
+                "type": "offer"
+            })
             
-            # Handle the offer with optimized SDP
-            logger.info(f"🔄 Processing WebRTC offer...")
-            answer = await self.webrtc_service.handle_offer(pc, offer_data)
-            logger.info(f"✅ Generated WebRTC answer (SDP length: {len(answer.get('sdp', ''))} chars)")
-            
-            # Send answer back with connection info
+            # ✅ SEND response
             response = {
                 **answer,
                 "connection_id": connection_id,
                 "stream_info": {
-                    "fps": self.webrtc_service.quality_settings["fps"],
-                    "bitrate": self.webrtc_service.quality_settings["bitrate"],
-                    "format": self.webrtc_service.quality_settings["format"],
-                    "optimization": "ultra_low_latency_idb_stream",
-                    "udid": self.webrtc_service.udid,
-                    "frame_available": True
+                    "udid": self.webrtc_service.udid
                 }
             }
             
             await websocket.send_text(json.dumps(response))
-            logger.info(f"📤 Sent WebRTC answer to client: {connection_id}")
-            
-            # Log connection state
-            logger.info(f"📊 WebRTC connection state: {pc.connectionState}")
-            logger.info(f"📊 ICE connection state: {pc.iceConnectionState}")
+            logger.info(f"📤 Sent answer: {connection_id}")
             
         except Exception as e:
-            logger.error(f"❌ Failed to handle WebRTC offer from {websocket_id}: {e}")
+            logger.error(f"❌ Offer error: {e}")
             
-            # Clean up the connection if it was created
             if connection_id and connection_id in self.webrtc_service.webrtc_connections:
-                logger.info(f"🧹 Cleaning up failed connection: {connection_id}")
                 self.webrtc_service.remove_connection(connection_id)
                 if websocket_id in self.active_connections:
                     del self.active_connections[websocket_id]
             
             await websocket.send_text(json.dumps({
                 "type": "error",
-                "error": f"Failed to handle offer: {str(e)}",
-                "code": "OFFER_HANDLING_FAILED",
-                "details": {
-                    "websocket_id": websocket_id,
-                    "connection_id": connection_id
-                }
-            }))
-
+                "error": f"Offer failed: {str(e)}",
+                "code": "OFFER_FAILED"
+            }))    
 
     async def _handle_ice_candidate(self, websocket: WebSocket, websocket_id: str, data: dict):
         """Handle ICE candidate with connection lookup"""
