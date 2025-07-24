@@ -59,11 +59,9 @@
             max-width: 100%;
             display: block;
             object-fit: contain;
-            /* For video element */
         }
 
         #webrtc-video {
-            /* Ensure WebRTC video has same constraints as canvas */
             max-height: 70vh;
             aspect-ratio: auto;
         }
@@ -150,7 +148,6 @@
             background-color: #1e7e34;
         }
 
-        /* Active mode button styling */
         .mode-toggle button.active {
             background-color: #007bff !important;
             color: white !important;
@@ -211,13 +208,122 @@
             grid-template-columns: repeat(2, 1fr);
         }
 
-        /* WebRTC Quality Section - Hidden by default */
         #webrtc-quality-section {
             display: none;
         }
 
         #webrtc-quality-section.visible {
             display: block;
+        }
+
+        /* App Management Styles */
+        .app-upload-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .app-upload-section input[type="file"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+            min-width: 200px;
+            font-size: 13px;
+        }
+
+        .app-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+
+        .app-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .app-item:last-child {
+            border-bottom: none;
+        }
+
+        .app-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .app-name {
+            font-weight: bold;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .app-bundle {
+            font-size: 11px;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .app-actions {
+            display: flex;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+
+        .app-actions button {
+            padding: 5px 8px;
+            font-size: 11px;
+            min-width: auto;
+        }
+
+        .btn-app-launch {
+            background-color: #28a745;
+        }
+
+        .btn-app-launch:hover {
+            background-color: #218838;
+        }
+
+        .btn-app-stop {
+            background-color: #ffc107;
+            color: #000;
+        }
+
+        .btn-app-stop:hover {
+            background-color: #e0a800;
+        }
+
+        .btn-app-uninstall {
+            background-color: #dc3545;
+        }
+
+        .btn-app-uninstall:hover {
+            background-color: #c82333;
+        }
+
+        .no-apps {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .app-count {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
         }
 
         /* Responsive design */
@@ -254,6 +360,11 @@
             button {
                 font-size: 12px;
                 padding: 8px 10px;
+            }
+
+            .app-actions {
+                flex-direction: column;
+                gap: 3px;
             }
         }
 
@@ -331,7 +442,6 @@
 
             <div id="container">
                 <canvas id="screen" width="400" height="600"></canvas>
-                <!-- WebRTC video with same constraints -->
                 <video id="webrtc-video" style="display: none;" autoplay playsinline muted></video>
                 <div class="simulator-info">
                     <div id="dimensionInfo">Loading simulator dimensions...</div>
@@ -354,7 +464,7 @@
                 </div>
             </div>
 
-            <!-- WebRTC Quality Section - Only visible in WebRTC mode -->
+            <!-- WebRTC Quality Section -->
             <div id="webrtc-quality-section" class="controls-section">
                 <h3>🎬 WebRTC Quality</h3>
                 <div class="mode-toggle controls-grid">
@@ -364,6 +474,24 @@
                 </div>
                 <div style="font-size: 11px; color: #666; margin-top: 8px; text-align: center;">
                     Medium: 45fps/3Mbps | High: 60fps/5Mbps | Ultra: 60fps/8Mbps
+                </div>
+            </div>
+
+            <!-- App Management Section -->
+            <div class="controls-section">
+                <h3>📱 App Management</h3>
+
+                <!-- App Upload -->
+                <div class="app-upload-section">
+                    <input type="file" id="ipaFile" accept=".ipa" placeholder="Select IPA file...">
+                    <button onclick="installApp()" class="btn-app-launch">📦 Install</button>
+                    <button onclick="refreshApps()" class="btn-primary">🔄 Refresh</button>
+                </div>
+
+                <!-- App List -->
+                <div class="app-count" id="appCount">Loading apps...</div>
+                <div class="app-list" id="appList">
+                    <div class="no-apps">Loading installed apps...</div>
                 </div>
             </div>
 
@@ -397,7 +525,6 @@
                     <button id="swipeToggle" onclick="toggleSwipeMode()">✋ Enable Swipe Mode</button>
                 </div>
 
-                <!-- Add a line break for better spacing -->
                 <br>
 
                 <div class="controls-grid">
@@ -433,7 +560,6 @@
     <script>
         // Pass session_id to JavaScript
         const SESSION_ID = '{{ session_id }}';
-        
 
         const canvas = document.getElementById('screen');
         const ctx = canvas.getContext('2d');
@@ -445,7 +571,6 @@
         const latencyInfo = document.getElementById('latencyInfo');
         const webrtcVideo = document.getElementById('webrtc-video');
         let currentWebRTCQuality = 'high';
-
 
         let currentMode = 'video';
         let videoWs = null;
@@ -465,9 +590,8 @@
         let webrtcQualitySettings = {
             fps: 60,
             resolution: 'high',
-            bitrate: 5000000  // 5 Mbps
+            bitrate: 5000000
         };
-
 
         // Gesture mode
         let swipeMode = false;
@@ -484,8 +608,11 @@
         };
 
         // Coordinate systems
-        let pixelWidth = 0, pixelHeight = 0;    // For display
-        let pointWidth = 0, pointHeight = 0;    // For taps
+        let pixelWidth = 0, pixelHeight = 0;
+        let pointWidth = 0, pointHeight = 0;
+
+        // App management
+        let installedApps = [];
 
         init();
 
@@ -493,6 +620,153 @@
             setupControlWebSocket();
             setupKeyboardShortcuts();
             switchMode('video');
+            loadInstalledApps();
+        }
+
+        // App Management Functions
+        async function loadInstalledApps() {
+            try {
+                const response = await fetch(`/api/sessions/${SESSION_ID}/apps`);
+                const data = await response.json();
+
+                if (data.success) {
+                    installedApps = data.apps;
+                    renderAppList();
+                } else {
+                    document.getElementById('appCount').textContent = 'Failed to load apps';
+                    document.getElementById('appList').innerHTML = '<div class="no-apps">Failed to load apps</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load apps:', error);
+                document.getElementById('appCount').textContent = 'Error loading apps';
+                document.getElementById('appList').innerHTML = '<div class="no-apps">Error loading apps</div>';
+            }
+        }
+
+        function renderAppList() {
+            const appCountElement = document.getElementById('appCount');
+            const appListElement = document.getElementById('appList');
+
+            appCountElement.textContent = `Installed Apps (${installedApps.length})`;
+
+            if (installedApps.length === 0) {
+                appListElement.innerHTML = '<div class="no-apps">No apps installed</div>';
+                return;
+            }
+
+            appListElement.innerHTML = installedApps.map(app => `
+                <div class="app-item">
+                    <div class="app-info">
+                        <div class="app-name" title="${app.app_name}">${app.app_name}</div>
+                        <div class="app-bundle" title="${app.bundle_id}">${app.bundle_id}</div>
+                    </div>
+                    <div class="app-actions">
+                        <button onclick="launchApp('${app.bundle_id}')" class="btn-app-launch" title="Launch App">
+                            ▶️
+                        </button>
+                        <button onclick="terminateApp('${app.bundle_id}')" class="btn-app-stop" title="Stop App">
+                            ⏹️
+                        </button>
+                        <button onclick="uninstallApp('${app.bundle_id}')" class="btn-app-uninstall" title="Uninstall App">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function installApp() {
+            const fileInput = document.getElementById('ipaFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showTemporaryStatus('Please select an IPA file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('ipa_file', file);
+
+            try {
+                showTemporaryStatus('Installing app...');
+                const response = await fetch(`/api/sessions/${SESSION_ID}/apps/install`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showTemporaryStatus('App installed successfully!');
+                    fileInput.value = ''; // Clear file input
+                    loadInstalledApps(); // Refresh app list
+                } else {
+                    showTemporaryStatus('Failed to install app: ' + (data.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to install app:', error);
+                showTemporaryStatus('Failed to install app: ' + error.message);
+            }
+        }
+
+        async function launchApp(bundleId) {
+            try {
+                showTemporaryStatus(`Launching ${bundleId}...`);
+                const response = await fetch(`/api/sessions/${SESSION_ID}/apps/${bundleId}/launch`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                showTemporaryStatus(data.success ? 'App launched successfully!' : 'Failed to launch app');
+            } catch (error) {
+                console.error('Failed to launch app:', error);
+                showTemporaryStatus('Failed to launch app');
+            }
+        }
+
+        async function terminateApp(bundleId) {
+            try {
+                showTemporaryStatus(`Stopping ${bundleId}...`);
+                const response = await fetch(`/api/sessions/${SESSION_ID}/apps/${bundleId}/terminate`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                showTemporaryStatus(data.success ? 'App stopped successfully!' : 'Failed to stop app');
+            } catch (error) {
+                console.error('Failed to terminate app:', error);
+                showTemporaryStatus('Failed to stop app');
+            }
+        }
+
+        async function uninstallApp(bundleId) {
+            if (!confirm(`Are you sure you want to uninstall ${bundleId}?`)) {
+                return;
+            }
+
+            try {
+                showTemporaryStatus(`Uninstalling ${bundleId}...`);
+                const response = await fetch(`/api/sessions/${SESSION_ID}/apps/${bundleId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showTemporaryStatus('App uninstalled successfully!');
+                    loadInstalledApps(); // Refresh app list
+                } else {
+                    showTemporaryStatus('Failed to uninstall app');
+                }
+            } catch (error) {
+                console.error('Failed to uninstall app:', error);
+                showTemporaryStatus('Failed to uninstall app');
+            }
+        }
+
+        function refreshApps() {
+            loadInstalledApps();
+            showTemporaryStatus('Refreshing app list...');
         }
 
 
@@ -504,8 +778,6 @@
                     case 'w': switchMode('webrtc'); break;
                     case 'v': switchMode('video'); break;
                     case 'c': switchMode('screenshot'); break;
-
-                    // These should work in ALL modes
                     case 'h': pressButton('home'); break;
                     case 'l': pressButton('lock'); break;
                     case 's': pressButton('siri'); break;

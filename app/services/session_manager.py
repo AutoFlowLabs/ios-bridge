@@ -24,7 +24,150 @@ class SessionManager:
         
         # Load existing sessions on startup
         self._load_sessions()
-    
+        
+        # Detect and recover orphaned simulators
+        self._recover_orphaned_simulators()
+
+    def _recover_orphaned_simulators(self):
+        """Detect running simulators not in session DB and create entries for them"""
+        try:
+            logger.info("Scanning for orphaned simulators...")
+            
+            # Get all currently running simulators
+            success, output = self.ios_manager._run_command([
+                'xcrun', 'simctl', 'list', 'devices', '-j'
+            ])
+            
+            if not success:
+                logger.error("Failed to get device list for orphaned simulator recovery")
+                return
+            
+            data = json.loads(output)
+            running_simulators = []
+            
+            # Find all running/booted simulators
+            for runtime, devices in data.get('devices', {}).items():
+                for device in devices:
+                    if device.get('state') == 'Booted':
+                        running_simulators.append({
+                            'udid': device.get('udid'),
+                            'name': device.get('name'),
+                            'runtime': runtime,
+                            'state': device.get('state')
+                        })
+            
+            logger.info(f"Found {len(running_simulators)} running simulators")
+            
+            # Check which ones are not in our session database
+            existing_udids = {session.udid for session in self.active_sessions.values()}
+            orphaned_count = 0
+            
+            for sim in running_simulators:
+                udid = sim['udid']
+                if udid not in existing_udids:
+                    # This is an orphaned simulator - create a session for it
+                    self._create_orphaned_session(sim)
+                    orphaned_count += 1
+            
+            if orphaned_count > 0:
+                logger.info(f"Recovered {orphaned_count} orphaned simulator sessions")
+                # Save the updated sessions
+                self._save_sessions()
+            else:
+                logger.info("No orphaned simulators found")
+                
+        except Exception as e:
+            logger.error(f"Failed to recover orphaned simulators: {e}")
+
+    def _create_orphaned_session(self, sim_info: Dict):
+        """Create a session entry for an orphaned simulator"""
+        try:
+            import uuid
+            
+            udid = sim_info['udid']
+            name = sim_info['name']
+            runtime = sim_info['runtime']
+            
+            # Generate a session ID
+            session_id = str(uuid.uuid4())
+            
+            # Extract device type and iOS version from runtime and name
+            ios_version = self._extract_ios_version_from_runtime(runtime)
+            device_type = self._extract_device_type_from_name(name)
+            
+            # Get the PID of the running simulator
+            pid = self.ios_manager._get_simulator_pid(udid)
+            
+            # Create device object
+            device = SimulatorDevice(
+                name=name,
+                identifier=udid,
+                runtime=runtime,
+                state=sim_info['state'],
+                udid=udid
+            )
+            
+            # Create session object
+            session = SimulatorSession(
+                session_id=session_id,
+                device=device,
+                udid=udid,
+                device_type=device_type,
+                ios_version=ios_version,
+                created_at=time.time(),  # Use current time as we don't know real creation time
+                pid=pid,
+                installed_apps={}  # Will be populated if needed
+            )
+            
+            # Add to both managers
+            self.active_sessions[session_id] = session
+            self.ios_manager.active_sessions[session_id] = session
+            
+            logger.info(f"Created session {session_id} for orphaned simulator: {device_type} iOS {ios_version} (UDID: {udid})")
+            
+        except Exception as e:
+            logger.error(f"Failed to create session for orphaned simulator {sim_info.get('udid', 'unknown')}: {e}")
+
+    def _extract_ios_version_from_runtime(self, runtime: str) -> str:
+        """Extract iOS version from runtime string (e.g., 'com.apple.CoreSimulator.SimRuntime.iOS-18-2' -> '18.2')"""
+        try:
+            # Runtime format is usually like: com.apple.CoreSimulator.SimRuntime.iOS-18-2
+            if 'iOS-' in runtime:
+                version_part = runtime.split('iOS-')[-1]
+                # Replace dashes with dots: 18-2 -> 18.2
+                return version_part.replace('-', '.')
+            return "Unknown"
+        except:
+            return "Unknown"
+
+    def _extract_device_type_from_name(self, name: str) -> str:
+        """Extract device type from simulator name"""
+        try:
+            # Simulator names often contain device type info
+            # e.g., "iPhone 15 Pro" or "sim_abc123_iPhone_16"
+            
+            # Check for common device patterns
+            if 'iPhone' in name:
+                # Try to extract iPhone model
+                import re
+                # Look for patterns like "iPhone 15", "iPhone 16 Pro", etc.
+                match = re.search(r'iPhone\s+[\w\s]*\d+[\w\s]*', name)
+                if match:
+                    return match.group().strip()
+                return "iPhone"
+            elif 'iPad' in name:
+                # Try to extract iPad model
+                import re
+                match = re.search(r'iPad[\w\s]*', name)
+                if match:
+                    return match.group().strip()
+                return "iPad"
+            
+            # Fallback: return the full name
+            return name
+        except:
+            return "Unknown Device"
+
     def _serialize_session(self, session: SimulatorSession) -> Dict:
         """Convert SimulatorSession to JSON-serializable dict"""
         return {
@@ -322,6 +465,13 @@ class SessionManager:
                     logger.info(f"Removed old backup: {old_backup.name}")
         except Exception as e:
             logger.error(f"Failed to cleanup storage: {e}")
+
+    def recover_orphaned_simulators(self) -> int:
+        """Manually trigger orphaned simulator recovery and return count of recovered sessions"""
+        initial_count = len(self.active_sessions)
+        self._recover_orphaned_simulators()
+        recovered_count = len(self.active_sessions) - initial_count
+        return recovered_count
 
 # Global session manager instance
 session_manager = SessionManager()

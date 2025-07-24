@@ -1,5 +1,6 @@
 import signal
 import atexit
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
@@ -18,7 +19,25 @@ from app.api.websockets.video_ws import VideoWebSocket
 from app.api.websockets.webrtc_ws import WebRTCWebSocket
 from app.api.websockets.screenshot_ws import ScreenshotWebSocket
 
-app = FastAPI(title="iOS Remote Control", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Application starting up...")
+    try:
+        # Trigger orphaned simulator recovery on startup
+        logger.info("Performing orphaned simulator recovery...")
+        session_manager._recover_orphaned_simulators()
+        logger.info("Startup complete")
+    except Exception as e:
+        logger.error(f"Error during startup: {e}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Application shutting down...")
+    cleanup()
+
+app = FastAPI(title="iOS Remote Control", version="1.0.0", lifespan=lifespan)
 
 # Templates
 templates = Jinja2Templates(directory="templates")

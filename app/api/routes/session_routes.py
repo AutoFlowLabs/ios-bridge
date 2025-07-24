@@ -50,6 +50,20 @@ async def list_sessions():
         logger.error(f"Error listing sessions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/recover-orphaned")
+async def recover_orphaned_simulators():
+    """Manually trigger recovery of orphaned simulators"""
+    try:
+        recovered_count = session_manager.recover_orphaned_simulators()
+        return {
+            "success": True,
+            "message": f"Recovered {recovered_count} orphaned simulator sessions",
+            "recovered_count": recovered_count
+        }
+    except Exception as e:
+        logger.error(f"Error recovering orphaned simulators: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/{session_id}")
 async def get_session_info(session_id: str):
     """Get detailed information about a session"""
