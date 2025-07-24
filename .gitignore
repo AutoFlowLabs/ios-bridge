@@ -9,3 +9,4 @@ dist/
 *.ipa
 *.apk
 *.log
+session_storage/

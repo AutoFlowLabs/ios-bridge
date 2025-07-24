@@ -10,11 +10,11 @@ from app.services.screenshot_service import ScreenshotService
 from app.utils.system_utils import SystemUtils
 
 class VideoService:
-    """Service for video streaming"""
+    """Service for video streaming with dynamic UDID support"""
     
-    def __init__(self):
-        self.udid = settings.UDID
-        self.screenshot_service = ScreenshotService()
+    def __init__(self, udid: Optional[str] = None):
+        self.udid = udid
+        self.screenshot_service = ScreenshotService(udid)
         
         # Video streaming state
         self.video_clients: List[any] = []
@@ -24,11 +24,22 @@ class VideoService:
         self.video_capture_thread = None
         self.video_lock = threading.Lock()
     
+    def set_udid(self, udid: str):
+        """Set the UDID for this service instance"""
+        self.udid = udid
+        self.screenshot_service.set_udid(udid)
+    
     def start_video_capture(self) -> bool:
         """Start video capture"""
+        if not self.udid:
+            logger.error("No UDID set for video capture")
+            return False
+            
         with self.video_lock:
             if self.video_streaming_active:
                 return True
+            
+            logger.info(f"Starting video capture for UDID: {self.udid}")
             
             # Try different capture methods
             if self._try_idb_video_stream():
@@ -44,7 +55,7 @@ class VideoService:
     def _try_idb_video_stream(self) -> bool:
         """Try idb video-stream"""
         try:
-            logger.info("Attempting idb video-stream...")
+            logger.info(f"Attempting idb video-stream for {self.udid}...")
             cmd = [
                 "idb", "video-stream",
                 "--udid", self.udid,
@@ -63,22 +74,22 @@ class VideoService:
                     target=self._process_idb_video_stream, daemon=True
                 )
                 self.video_capture_thread.start()
-                logger.info("✅ idb video-stream started successfully")
+                logger.info(f"✅ idb video-stream started successfully for {self.udid}")
                 return True
             else:
                 stderr = self.video_capture_process.stderr.read().decode()
-                logger.warning(f"❌ idb video-stream failed: {stderr}")
+                logger.warning(f"❌ idb video-stream failed for {self.udid}: {stderr}")
                 self.video_capture_process = None
                 
         except Exception as e:
-            logger.warning(f"❌ idb video-stream error: {e}")
+            logger.warning(f"❌ idb video-stream error for {self.udid}: {e}")
         
         return False
     
     def _try_ffmpeg_hardware_capture(self) -> bool:
         """Try FFmpeg hardware-accelerated capture"""
         try:
-            logger.info("Trying FFmpeg hardware-accelerated capture...")
+            logger.info(f"Trying FFmpeg hardware-accelerated capture for {self.udid}...")
             window_info = SystemUtils.get_simulator_window_info()
             
             cmd = [
@@ -114,22 +125,22 @@ class VideoService:
                     target=self._process_h264_stream, daemon=True
                 )
                 self.video_capture_thread.start()
-                logger.info("✅ FFmpeg hardware capture started")
+                logger.info(f"✅ FFmpeg hardware capture started for {self.udid}")
                 return True
             else:
                 stderr = self.video_capture_process.stderr.read().decode()
-                logger.warning(f"❌ FFmpeg hardware capture failed: {stderr}")
+                logger.warning(f"❌ FFmpeg hardware capture failed for {self.udid}: {stderr}")
                 self.video_capture_process = None
                 
         except Exception as e:
-            logger.warning(f"❌ FFmpeg hardware capture error: {e}")
+            logger.warning(f"❌ FFmpeg hardware capture error for {self.udid}: {e}")
         
         return False
     
     def _try_ffmpeg_software_capture(self) -> bool:
         """Try FFmpeg software capture"""
         try:
-            logger.info("Trying FFmpeg software capture...")
+            logger.info(f"Trying FFmpeg software capture for {self.udid}...")
             window_info = SystemUtils.get_simulator_window_info()
             
             cmd = [
@@ -160,20 +171,20 @@ class VideoService:
                     target=self._process_mjpeg_stream, daemon=True
                 )
                 self.video_capture_thread.start()
-                logger.info("✅ FFmpeg software capture started")
+                logger.info(f"✅ FFmpeg software capture started for {self.udid}")
                 return True
             else:
                 stderr = self.video_capture_process.stderr.read().decode()
-                logger.warning(f"❌ FFmpeg software capture failed: {stderr}")
+                logger.warning(f"❌ FFmpeg software capture failed for {self.udid}: {stderr}")
                 
         except Exception as e:
-            logger.warning(f"❌ FFmpeg software error: {e}")
+            logger.warning(f"❌ FFmpeg software error for {self.udid}: {e}")
         
         return False
     
     def _start_screenshot_mode(self) -> bool:
         """Start high-frequency screenshot mode"""
-        logger.info("Falling back to ultra high-frequency screenshots...")
+        logger.info(f"Falling back to ultra high-frequency screenshots for {self.udid}...")
         self.video_streaming_active = True
         self.video_capture_thread = threading.Thread(
             target=self._ultra_high_fps_screenshots, daemon=True
@@ -183,7 +194,7 @@ class VideoService:
     
     def _process_idb_video_stream(self):
         """Process idb video stream"""
-        logger.info("Processing idb video stream...")
+        logger.info(f"Processing idb video stream for {self.udid}...")
         while self.video_streaming_active and self.video_capture_process:
             try:
                 # For now, fall back to screenshot method for simplicity
@@ -198,12 +209,12 @@ class VideoService:
                     })
                 time.sleep(1/60)
             except Exception as e:
-                logger.error(f"idb stream processing error: {e}")
+                logger.error(f"idb stream processing error for {self.udid}: {e}")
                 break
     
     def _process_h264_stream(self):
         """Process H.264 stream from FFmpeg"""
-        logger.info("Processing H.264 stream...")
+        logger.info(f"Processing H.264 stream for {self.udid}...")
         frame_count = 0
         while self.video_streaming_active and self.video_capture_process:
             try:
@@ -220,12 +231,12 @@ class VideoService:
                 frame_count += 1
                 time.sleep(1/45)
             except Exception as e:
-                logger.error(f"H.264 processing error: {e}")
+                logger.error(f"H.264 processing error for {self.udid}: {e}")
                 break
     
     def _process_mjpeg_stream(self):
         """Process MJPEG stream from FFmpeg"""
-        logger.info("Processing MJPEG stream...")
+        logger.info(f"Processing MJPEG stream for {self.udid}...")
         buffer = b""
         
         while self.video_streaming_active and self.video_capture_process:
@@ -259,12 +270,12 @@ class VideoService:
                         break
                         
             except Exception as e:
-                logger.error(f"MJPEG processing error: {e}")
+                logger.error(f"MJPEG processing error for {self.udid}: {e}")
                 break
     
     def _ultra_high_fps_screenshots(self):
         """Ultra high-frequency screenshot capture"""
-        logger.info("Starting ultra high-FPS screenshot mode...")
+        logger.info(f"Starting ultra high-FPS screenshot mode for {self.udid}...")
         
         target_fps = settings.DEFAULT_VIDEO_FPS
         frame_interval = 1.0 / target_fps
@@ -288,12 +299,12 @@ class VideoService:
                         
                         frame_count += 1
                         if frame_count % 120 == 0:
-                            logger.info(f"Screenshot mode: {frame_count} frames captured")
+                            logger.info(f"Screenshot mode for {self.udid}: {frame_count} frames captured")
                     
                     last_capture = current_time
                     
                 except Exception as e:
-                    logger.error(f"Screenshot error: {e}")
+                    logger.error(f"Screenshot error for {self.udid}: {e}")
                     time.sleep(0.1)
             else:
                 sleep_time = frame_interval - (current_time - last_capture)
@@ -320,7 +331,7 @@ class VideoService:
     
     def stop_video_capture(self):
         """Stop video capture"""
-        logger.info("Stopping video capture...")
+        logger.info(f"Stopping video capture for UDID: {self.udid}")
         
         with self.video_lock:
             self.video_streaming_active = False
@@ -367,5 +378,6 @@ class VideoService:
             "video_streaming": self.video_streaming_active,
             "video_clients": len(self.video_clients),
             "queue_size": self.video_frame_queue.qsize(),
-            "capture_method": "hardware" if self.video_capture_process else "screenshots"
+            "capture_method": "hardware" if self.video_capture_process else "screenshots",
+            "udid": self.udid
         }

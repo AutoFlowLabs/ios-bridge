@@ -4,8 +4,8 @@ import os
 class Settings:
     """Application settings"""
     
-    # Device Configuration
-    UDID: str = "F93FBAE5-7175-4AFF-A262-DDEBB8A6D662"
+    # Device Configuration - Remove hardcoded UDID
+    # UDID will be provided by session management
     
     # Video Configuration
     DEFAULT_VIDEO_FPS: int = 60

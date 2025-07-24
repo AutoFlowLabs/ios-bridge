@@ -8,12 +8,20 @@ from app.core.exceptions import DeviceNotAccessibleException
 class DeviceService:
     """Service for device interactions"""
     
-    def __init__(self):
-        self.udid = settings.UDID
+    def __init__(self, udid: Optional[str] = None):
+        self.udid = udid
         self._point_dimensions_cache: Optional[Tuple[int, int]] = None
+    
+    def set_udid(self, udid: str):
+        """Set the UDID for this service instance"""
+        self.udid = udid
+        self._point_dimensions_cache = None  # Reset cache when UDID changes
     
     async def get_point_dimensions(self) -> Tuple[int, int]:
         """Get device point dimensions with caching"""
+        if not self.udid:
+            raise DeviceNotAccessibleException("No UDID set for device service")
+            
         if self._point_dimensions_cache:
             return self._point_dimensions_cache
         
@@ -40,13 +48,17 @@ class DeviceService:
     
     async def tap(self, x: int, y: int) -> bool:
         """Perform tap gesture"""
+        if not self.udid:
+            logger.error("No UDID set for tap action")
+            return False
+            
         try:
             cmd = ["idb", "ui", "tap", str(x), str(y), "--udid", self.udid]
             result = subprocess.run(cmd, capture_output=True, text=True, 
                                   timeout=settings.TAP_TIMEOUT)
             
             if result.returncode == 0:
-                logger.info(f"✅ Tap: ({x}, {y})")
+                logger.info(f"✅ Tap: ({x}, {y}) on {self.udid}")
                 return True
             else:
                 logger.error(f"❌ Tap failed: {result.stderr}")
@@ -55,9 +67,14 @@ class DeviceService:
             logger.error(f"Tap error: {e}")
             return False
     
+    # ... rest of the methods remain the same but use self.udid
     async def swipe(self, start_x: int, start_y: int, end_x: int, end_y: int, 
                    duration: float = 0.2) -> bool:
         """Perform swipe gesture"""
+        if not self.udid:
+            logger.error("No UDID set for swipe action")
+            return False
+            
         try:
             cmd = [
                 "idb", "ui", "swipe", 
@@ -68,7 +85,7 @@ class DeviceService:
                                   timeout=settings.SWIPE_TIMEOUT)
             
             if result.returncode == 0:
-                logger.info(f"✅ Swipe: ({start_x}, {start_y}) -> ({end_x}, {end_y})")
+                logger.info(f"✅ Swipe: ({start_x}, {start_y}) -> ({end_x}, {end_y}) on {self.udid}")
                 return True
             else:
                 logger.error(f"❌ Swipe failed: {result.stderr}")
@@ -79,6 +96,10 @@ class DeviceService:
     
     async def input_text(self, text: str) -> bool:
         """Input text"""
+        if not self.udid:
+            logger.error("No UDID set for text input")
+            return False
+            
         try:
             cmd = ["idb", "ui", "text", text, "--udid", self.udid]
             result = subprocess.run(cmd, capture_output=True, text=True, 
@@ -96,6 +117,10 @@ class DeviceService:
     
     async def press_button(self, button: str) -> bool:
         """Press device button"""
+        if not self.udid:
+            logger.error("No UDID set for button press")
+            return False
+            
         try:
             button_mapping = {
                 'home': 'HOME', 'lock': 'LOCK', 'siri': 'SIRI',
@@ -108,7 +133,7 @@ class DeviceService:
                                   timeout=settings.TAP_TIMEOUT)
             
             if result.returncode == 0:
-                logger.info(f"✅ Button: {button}")
+                logger.info(f"✅ Button: {button} on {self.udid}")
                 return True
             else:
                 logger.error(f"❌ Button failed: {button}")
@@ -119,6 +144,9 @@ class DeviceService:
     
     async def is_accessible(self) -> bool:
         """Check if device is accessible"""
+        if not self.udid:
+            return False
+            
         try:
             cmd = ["idb", "list-targets"]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)

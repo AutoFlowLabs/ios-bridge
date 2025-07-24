@@ -11,13 +11,21 @@ from app.utils.image_utils import ImageUtils
 from app.utils.system_utils import SystemUtils
 
 class ScreenshotService:
-    """Service for screenshot capture"""
+    """Service for screenshot capture with dynamic UDID support"""
     
-    def __init__(self):
-        self.udid = settings.UDID
+    def __init__(self, udid: Optional[str] = None):
+        self.udid = udid
+    
+    def set_udid(self, udid: str):
+        """Set the UDID for this service instance"""
+        self.udid = udid
     
     def capture_screenshot(self, quality: int = None) -> Optional[Dict[str, any]]:
         """Capture device screenshot"""
+        if not self.udid:
+            logger.error("No UDID set for screenshot capture")
+            return None
+            
         if quality is None:
             quality = settings.DEFAULT_JPEG_QUALITY
             
@@ -48,9 +56,9 @@ class ScreenshotService:
                     }
                     
         except subprocess.TimeoutExpired:
-            logger.debug("Screenshot timeout")
+            logger.debug(f"Screenshot timeout for UDID: {self.udid}")
         except Exception as e:
-            logger.error(f"Screenshot error: {e}")
+            logger.error(f"Screenshot error for UDID {self.udid}: {e}")
         
         return None
     

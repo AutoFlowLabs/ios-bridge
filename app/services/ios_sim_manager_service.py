@@ -31,6 +31,7 @@ class InstalledApp:
     app_name: str
     app_path: str
     installed_at: float
+    app_type: str = "user"  # Add this field with default value
 
 @dataclass
 class SimulatorSession:
@@ -1265,8 +1266,6 @@ class iOSSimulatorManager:
             'installed_apps': {bid: {'name': app.app_name, 'installed_at': app.installed_at} 
                             for bid, app in session.installed_apps.items()}
         }
-
-
 
 
 

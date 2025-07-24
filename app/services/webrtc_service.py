@@ -52,10 +52,11 @@ class SimulatorVideoTrack(VideoStreamTrack):
         return frame
 
 class WebRTCService:
-    """Service for WebRTC video streaming"""
+    """Service for WebRTC video streaming with dynamic UDID support"""
     
-    def __init__(self):
-        self.screenshot_service = ScreenshotService()
+    def __init__(self, udid: Optional[str] = None):
+        self.udid = udid
+        self.screenshot_service = ScreenshotService(udid)
         
         # WebRTC state
         self.webrtc_connections: Dict[str, RTCPeerConnection] = {}
@@ -69,8 +70,17 @@ class WebRTCService:
             "quality": 95
         }
     
+    def set_udid(self, udid: str):
+        """Set the UDID for this service instance"""
+        self.udid = udid
+        self.screenshot_service.set_udid(udid)
+    
     def start_webrtc_capture(self, fps: int = 60) -> bool:
         """Start high-quality WebRTC video capture"""
+        if not self.udid:
+            logger.error("No UDID set for WebRTC capture")
+            return False
+            
         if self.webrtc_active:
             return True
         
@@ -81,15 +91,16 @@ class WebRTCService:
                 daemon=True
             )
             self.webrtc_frame_thread.start()
-            logger.info(f"✅ High-quality WebRTC capture started at {fps}fps")
+            logger.info(f"✅ High-quality WebRTC capture started at {fps}fps for {self.udid}")
             return True
         except Exception as e:
-            logger.error(f"❌ WebRTC capture failed: {e}")
+            logger.error(f"❌ WebRTC capture failed for {self.udid}: {e}")
             self.webrtc_active = False
             return False
     
     def stop_webrtc_capture(self):
         """Stop WebRTC video capture"""
+        logger.info(f"Stopping WebRTC capture for UDID: {self.udid}")
         self.webrtc_active = False
         
         with self.webrtc_frame_lock:
@@ -109,7 +120,7 @@ class WebRTCService:
     
     def _webrtc_frame_producer(self):
         """High-quality frame producer for WebRTC"""
-        logger.info("Starting high-quality WebRTC frame producer...")
+        logger.info(f"Starting high-quality WebRTC frame producer for {self.udid}...")
         
         target_fps = self.webrtc_quality_settings["fps"]
         frame_interval = 1.0 / target_fps
@@ -149,11 +160,14 @@ class WebRTCService:
                             self.webrtc_current_frame = new_frame
                         
                         frame_count += 1
+                        
+                        if frame_count % 300 == 0:  # Log every 5 seconds
+                            logger.info(f"WebRTC frame producer for {self.udid}: {frame_count} frames processed")
                     
                     last_capture = frame_start
                     
                 except Exception as e:
-                    logger.error(f"WebRTC frame producer error: {e}")
+                    logger.error(f"WebRTC frame producer error for {self.udid}: {e}")
                     time.sleep(0.01)
             else:
                 sleep_time = frame_interval - (time.time() - last_capture)
@@ -169,6 +183,7 @@ class WebRTCService:
             frame_array = self.webrtc_current_frame.to_ndarray(format='rgb24')
             return av.VideoFrame.from_ndarray(frame_array, format='rgb24')
     
+    # ... rest of the methods remain the same
     async def create_peer_connection(self) -> tuple[str, RTCPeerConnection]:
         """Create new peer connection"""
         if not self.webrtc_active:
@@ -183,7 +198,7 @@ class WebRTCService:
         
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
-            logger.info(f"WebRTC connection state: {pc.connectionState}")
+            logger.info(f"WebRTC connection state for {self.udid}: {pc.connectionState}")
             if pc.connectionState in ["failed", "closed"]:
                 if connection_id in self.webrtc_connections:
                     try:
@@ -243,7 +258,7 @@ class WebRTCService:
         
         if quality in presets:
             self.webrtc_quality_settings = presets[quality]
-            logger.info(f"WebRTC quality set to: {quality}")
+            logger.info(f"WebRTC quality set to: {quality} for {self.udid}")
             return {"success": True, "quality": quality, "settings": presets[quality]}
         else:
             return {"success": False, "error": "Invalid quality preset"}
@@ -253,5 +268,6 @@ class WebRTCService:
         return {
             "webrtc_active": self.webrtc_active,
             "webrtc_connections": len(self.webrtc_connections),
-            "quality_settings": self.webrtc_quality_settings
+            "quality_settings": self.webrtc_quality_settings,
+            "udid": self.udid
         }

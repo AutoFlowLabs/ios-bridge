@@ -1,8 +1,9 @@
 import signal
 import atexit
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from app.config.settings import settings
 from app.core.logging import logger
@@ -10,25 +11,17 @@ from app.services.video_service import VideoService
 from app.services.webrtc_service import WebRTCService
 from app.services.device_service import DeviceService
 from app.services.screenshot_service import ScreenshotService
-from app.api.routes import debug
+from app.services.session_manager import session_manager
+from app.api.routes import debug, session_routes
 from app.api.websockets.control_ws import ControlWebSocket
 from app.api.websockets.video_ws import VideoWebSocket
 from app.api.websockets.webrtc_ws import WebRTCWebSocket
 from app.api.websockets.screenshot_ws import ScreenshotWebSocket
 
-# Initialize services
-video_service = VideoService()
-webrtc_service = WebRTCService()
-device_service = DeviceService()
-screenshot_service = ScreenshotService()
-
-# Initialize WebSocket handlers
-control_ws = ControlWebSocket()
-video_ws = VideoWebSocket(video_service)
-webrtc_ws = WebRTCWebSocket(webrtc_service)
-screenshot_ws = ScreenshotWebSocket(device_service, screenshot_service)
-
 app = FastAPI(title="iOS Remote Control", version="1.0.0")
+
+# Templates
+templates = Jinja2Templates(directory="templates")
 
 # Static files
 import os
@@ -37,75 +30,199 @@ app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
 
 # Include routers
 app.include_router(debug.router)
+app.include_router(session_routes.router)
 
-# WebSocket endpoints
-@app.websocket("/ws/control")
-async def control_websocket(websocket: WebSocket):
+# Initialize WebSocket handlers
+control_ws = ControlWebSocket()
+
+# WebSocket endpoints with session_id
+@app.websocket("/ws/{session_id}/control")
+async def control_websocket(websocket: WebSocket, session_id: str):
+    """Control WebSocket endpoint"""
     try:
-        await control_ws.handle_connection(websocket)
+        await control_ws.handle_connection(websocket, session_id)
     except WebSocketDisconnect:
-        logger.info("Control WebSocket disconnected")
+        logger.info(f"Control WebSocket disconnected for session: {session_id}")
     except Exception as e:
-        logger.error(f"Control WebSocket error: {e}")
+        logger.error(f"Control WebSocket error for session {session_id}: {e}")
 
-@app.websocket("/ws/video")
-async def video_websocket(websocket: WebSocket):
+@app.websocket("/ws/{session_id}/video")
+async def video_websocket(websocket: WebSocket, session_id: str):
+    """Video WebSocket endpoint"""
     try:
+        # Validate session exists first
+        udid = session_manager.get_session_udid(session_id)
+        if not udid:
+            await websocket.accept()
+            await websocket.close(code=4004, reason="Session not found")
+            return
+        
+        # Create services for this session
+        video_service = VideoService(udid)
+        device_service = DeviceService(udid)
+        video_ws = VideoWebSocket(video_service, device_service)
+        
+        # Handle the connection
         await video_ws.handle_connection(websocket)
+        
     except WebSocketDisconnect:
-        logger.info("Video WebSocket disconnected")
+        logger.info(f"Video WebSocket disconnected for session: {session_id}")
     except Exception as e:
-        logger.error(f"Video WebSocket error: {e}")
+        logger.error(f"Video WebSocket error for session {session_id}: {e}")
 
-@app.websocket("/ws/webrtc")
-async def webrtc_websocket(websocket: WebSocket):
+@app.websocket("/ws/{session_id}/webrtc")
+async def webrtc_websocket(websocket: WebSocket, session_id: str):
+    """WebRTC WebSocket endpoint"""
     try:
+        # Validate session exists first
+        udid = session_manager.get_session_udid(session_id)
+        if not udid:
+            await websocket.accept()
+            await websocket.close(code=4004, reason="Session not found")
+            return
+        
+        # Create WebRTC service for this session
+        webrtc_service = WebRTCService(udid)
+        webrtc_ws = WebRTCWebSocket(webrtc_service)
+        
+        # Handle the connection (only call this once!)
         await webrtc_ws.handle_connection(websocket)
+        
     except WebSocketDisconnect:
-        logger.info("WebRTC WebSocket disconnected")
+        logger.info(f"WebRTC WebSocket disconnected for session: {session_id}")
     except Exception as e:
-        logger.error(f"WebRTC WebSocket error: {e}")
+        logger.error(f"WebRTC WebSocket error for session {session_id}: {e}")
 
-@app.websocket("/ws/screenshot")
-async def screenshot_websocket(websocket: WebSocket):
+@app.websocket("/ws/{session_id}/screenshot")
+async def screenshot_websocket(websocket: WebSocket, session_id: str):
+    """Screenshot WebSocket endpoint"""
     try:
+        # Validate session exists first
+        udid = session_manager.get_session_udid(session_id)
+        if not udid:
+            await websocket.accept()
+            await websocket.close(code=4004, reason="Session not found")
+            return
+        
+        # Create services for this session
+        device_service = DeviceService(udid)
+        screenshot_service = ScreenshotService(udid)
+        screenshot_ws = ScreenshotWebSocket(device_service, screenshot_service)
+        
+        # Handle the connection (only call this once!)
         await screenshot_ws.handle_connection(websocket)
+        
     except WebSocketDisconnect:
-        logger.info("Screenshot WebSocket disconnected")
+        logger.info(f"Screenshot WebSocket disconnected for session: {session_id}")
     except Exception as e:
-        logger.error(f"Screenshot WebSocket error: {e}")
+        logger.error(f"Screenshot WebSocket error for session {session_id}: {e}")
 
 # HTTP endpoints
-@app.get("/")
-def index():
-    return FileResponse(f"{settings.STATIC_DIR}/index.html")
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    """Main page - session list"""
+    return templates.TemplateResponse("session_list.html", {"request": request})
 
-@app.get("/status")
-async def get_status():
-    """Get application status"""
-    simulator_accessible = await device_service.is_accessible()
-    video_status = video_service.get_status()
-    webrtc_status = webrtc_service.get_status()
+@app.get("/control/{session_id}", response_class=HTMLResponse)
+async def control_page(request: Request, session_id: str):
+    """Control page for a specific session"""
+    # Verify session exists
+    session_info = session_manager.get_session_info(session_id)
+    if not session_info:
+        return HTMLResponse("Session not found", status_code=404)
     
-    return {
-        "udid": settings.UDID,
-        "simulator_accessible": simulator_accessible,
-        **video_status,
-        **webrtc_status,
-        "status": "healthy" if (video_status["video_streaming"] or webrtc_status["webrtc_active"]) else "starting"
-    }
+    return templates.TemplateResponse("control.html", {
+        "request": request,
+        "session_id": session_id,
+        "session_info": session_info
+    })
 
-@app.get("/webrtc/quality/{quality}")
-async def set_webrtc_quality(quality: str):
-    """Set WebRTC quality preset"""
-    return webrtc_service.set_quality_preset(quality)
+@app.get("/status/{session_id}")
+async def get_status(session_id: str):
+    """Get session status"""
+    try:
+        session_info = session_manager.get_session_info(session_id)
+        if not session_info:
+            return {"error": "Session not found", "status_code": 404}
+        
+        udid = session_manager.get_session_udid(session_id)
+        device_service = DeviceService(udid) if udid else None
+        simulator_accessible = await device_service.is_accessible() if device_service else False
+        
+        return {
+            "session_id": session_id,
+            "udid": udid,
+            "simulator_accessible": simulator_accessible,
+            "session_info": session_info,
+            "status": "healthy" if simulator_accessible else "offline"
+        }
+    except Exception as e:
+        logger.error(f"Error getting status for session {session_id}: {e}")
+        return {"error": str(e), "status_code": 500}
+
+@app.get("/webrtc/quality/{session_id}/{quality}")
+async def set_webrtc_quality(session_id: str, quality: str):
+    """Set WebRTC quality preset for a specific session"""
+    try:
+        udid = session_manager.get_session_udid(session_id)
+        if not udid:
+            return {"success": False, "error": "Session not found"}
+        
+        presets = {
+            "low": {"fps": 30, "resolution_scale": 1, "quality": 70},
+            "medium": {"fps": 45, "resolution_scale": 1.5, "quality": 85},
+            "high": {"fps": 60, "resolution_scale": 2, "quality": 95},
+            "ultra": {"fps": 60, "resolution_scale": 2.5, "quality": 98}
+        }
+        
+        if quality in presets:
+            return {
+                "success": True, 
+                "session_id": session_id,
+                "quality": quality, 
+                "settings": presets[quality]
+            }
+        else:
+            return {"success": False, "error": "Invalid quality preset"}
+            
+    except Exception as e:
+        logger.error(f"Error setting WebRTC quality for session {session_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+# Legacy endpoints for backward compatibility (if needed)
+@app.get("/status")
+async def get_legacy_status():
+    """Legacy status endpoint - shows all sessions"""
+    try:
+        sessions = session_manager.list_sessions()
+        return {
+            "total_sessions": len(sessions),
+            "sessions": sessions,
+            "status": "healthy" if sessions else "no_sessions"
+        }
+    except Exception as e:
+        logger.error(f"Error getting legacy status: {e}")
+        return {"error": str(e)}
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "iOS Remote Control",
+        "total_sessions": len(session_manager.list_sessions())
+    }
 
 # Cleanup
 def cleanup():
     """Cleanup on shutdown"""
     logger.info("Cleaning up services...")
-    video_service.stop_video_capture()
-    webrtc_service.stop_webrtc_capture()
+    try:
+        session_manager.delete_all_sessions()
+        logger.info("All sessions cleaned up successfully")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
 
 atexit.register(cleanup)
 signal.signal(signal.SIGTERM, lambda s, f: cleanup())

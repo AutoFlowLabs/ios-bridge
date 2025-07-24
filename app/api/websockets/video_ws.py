@@ -8,9 +8,9 @@ from app.services.device_service import DeviceService
 from app.models.responses import VideoFrame
 
 class VideoWebSocket:
-    def __init__(self, video_service: VideoService):
+    def __init__(self, video_service: VideoService, device_service: DeviceService):
         self.video_service = video_service
-        self.device_service = DeviceService()
+        self.device_service = device_service
     
     async def handle_connection(self, websocket: WebSocket):
         """Handle video WebSocket connection"""

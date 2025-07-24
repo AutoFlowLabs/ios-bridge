@@ -15,8 +15,6 @@ class WebRTCWebSocket:
         connection_id = str(uuid.uuid4())
         logger.info(f"WebRTC signaling connected: {connection_id}")
         
-        pc = None
-        
         try:
             # Start capture if not already running
             if not self.webrtc_service.webrtc_active:
@@ -44,7 +42,7 @@ class WebRTCWebSocket:
         
         if message_type == "offer":
             # Create new peer connection
-            connection_id, pc = await self.webrtc_service.create_peer_connection()
+            conn_id, pc = await self.webrtc_service.create_peer_connection()
             
             # Handle the offer
             answer = await self.webrtc_service.handle_offer(pc, data)
