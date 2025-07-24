@@ -505,6 +505,34 @@
                 </div>
             </div>
 
+            <div class="controls-section">
+                <h3>🔍 WebRTC Debug</h3>
+                <div class="controls-grid">
+                    <button onclick="sendWebRTCDebug()">🐛 Stream Debug</button>
+                    <button onclick="sendWebRTCStatus()">📊 WebRTC Status</button>
+                    <button onclick="testWebRTCConnection()">🔗 Test Connection</button>
+                    <button onclick="clearDebugLog()">🗑️ Clear Log</button>
+                </div>
+
+                <!-- Debug Log Area -->
+                <div id="debug-log" style="
+                    margin-top: 10px; 
+                    padding: 10px; 
+                    background: #f8f9fa; 
+                    border: 1px solid #ddd; 
+                    border-radius: 4px; 
+                    max-height: 200px; 
+                    overflow-y: auto; 
+                    font-family: 'Courier New', monospace; 
+                    font-size: 11px;
+                    line-height: 1.3;
+                    display: none;
+                ">
+                    <div style="font-weight: bold; margin-bottom: 5px;">Debug Log:</div>
+                    <div id="debug-content"></div>
+                </div>
+            </div>
+
             <div class="controls-section hardware-buttons">
                 <h3>🔘 Hardware Buttons</h3>
                 <div class="controls-grid">
@@ -1395,20 +1423,80 @@
                     }));
                 };
 
+
+
                 webrtcWs.onmessage = async (event) => {
                     const data = JSON.parse(event.data);
 
+                    // Log all WebRTC messages for debugging
+                    logDebug(`📨 Received: ${data.type}`);
+
                     if (data.type === 'answer') {
+                        logDebug('✅ Processing WebRTC answer...');
                         const enhancedAnswer = enhanceSDPForQuality({
                             type: 'answer',
                             sdp: data.sdp
                         });
 
                         await peerConnection.setRemoteDescription(new RTCSessionDescription(enhancedAnswer));
+                        logDebug('✅ WebRTC answer processed');
+
                     } else if (data.type === 'ice-candidate') {
                         if (data.candidate) {
                             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                            logDebug('🧊 ICE candidate added');
                         }
+
+                    } else if (data.type === 'stream-debug-response') {
+                        logDebug('🔍 === STREAM DEBUG RESPONSE ===');
+                        logDebug(`Stream Active: ${data.stream_status?.stream_active}`);
+                        logDebug(`WebRTC Active: ${data.stream_status?.webrtc_active}`);
+                        logDebug(`Frame Available: ${data.frame_status?.current_frame_available}`);
+                        logDebug(`Frame Queue Size: ${data.frame_status?.frame_queue_size}`);
+
+                        if (data.idb_stream_debug) {
+                            logDebug(`iDB Process Running: ${data.idb_stream_debug.process_info?.process_running}`);
+                            logDebug(`iDB Process PID: ${data.idb_stream_debug.process_info?.pid}`);
+                            if (data.idb_stream_debug.process_info?.stderr) {
+                                logDebug(`iDB stderr: ${data.idb_stream_debug.process_info.stderr}`);
+                            }
+                        }
+
+                        if (data.idb_connection_test) {
+                            logDebug(`iDB Connection Test: ${data.idb_connection_test.success ? '✅ Success' : '❌ Failed'}`);
+                            if (!data.idb_connection_test.success) {
+                                logDebug(`iDB Error: ${data.idb_connection_test.error}`);
+                            }
+                        }
+
+                        if (data.manual_stream_test) {
+                            logDebug(`Manual Stream Test: ${data.manual_stream_test.success ? '✅ Success' : '❌ Failed'}`);
+                            logDebug(`Process Running: ${data.manual_stream_test.process_was_running}`);
+                            logDebug(`Stdout Length: ${data.manual_stream_test.stdout_length} bytes`);
+                            logDebug(`Stderr Length: ${data.manual_stream_test.stderr_length} bytes`);
+                            if (data.manual_stream_test.stderr_preview) {
+                                logDebug(`Stderr Preview: ${data.manual_stream_test.stderr_preview}`);
+                            }
+                        }
+
+                        logDebug('🔍 === END DEBUG RESPONSE ===');
+
+                    } else if (data.type === 'status-response') {
+                        logDebug('📊 === STATUS RESPONSE ===');
+                        logDebug(`Connections: ${data.connections}`);
+                        logDebug(`Stream Active: ${data.stream_active}`);
+                        logDebug(`WebRTC Active: ${data.webrtc_active}`);
+                        logDebug(`Quality Settings: ${JSON.stringify(data.quality_settings)}`);
+                        logDebug('📊 === END STATUS ===');
+
+                    } else if (data.type === 'error') {
+                        logDebug(`❌ Error: ${data.error} (Code: ${data.code})`);
+                        if (data.suggestion) {
+                            logDebug(`💡 Suggestion: ${data.suggestion}`);
+                        }
+
+                    } else {
+                        logDebug(`📨 Other message: ${JSON.stringify(data)}`);
                     }
                 };
 
@@ -1730,6 +1818,68 @@
                     button.classList.add('active');
                 }
             });
+        }
+
+
+        // WebRTC Debug Functions
+        function sendWebRTCDebug() {
+            if (webrtcWs && webrtcWs.readyState === WebSocket.OPEN) {
+                logDebug('📤 Sending stream-debug request...');
+                webrtcWs.send(JSON.stringify({ type: 'stream-debug' }));
+
+                // Show debug log
+                document.getElementById('debug-log').style.display = 'block';
+            } else {
+                logDebug('❌ WebRTC WebSocket not connected. Current mode: ' + currentMode);
+                showTemporaryStatus('WebRTC not connected - switch to WebRTC mode first');
+            }
+        }
+
+        function sendWebRTCStatus() {
+            if (webrtcWs && webrtcWs.readyState === WebSocket.OPEN) {
+                logDebug('📤 Sending status-request...');
+                webrtcWs.send(JSON.stringify({ type: 'status-request' }));
+
+                // Show debug log
+                document.getElementById('debug-log').style.display = 'block';
+            } else {
+                logDebug('❌ WebRTC WebSocket not connected');
+                showTemporaryStatus('WebRTC not connected');
+            }
+        }
+
+        function testWebRTCConnection() {
+            logDebug('🔗 Testing WebRTC connection...');
+            logDebug(`Current mode: ${currentMode}`);
+            logDebug(`WebRTC WS state: ${webrtcWs ? webrtcWs.readyState : 'null'}`);
+            logDebug(`Peer connection: ${peerConnection ? peerConnection.connectionState : 'null'}`);
+
+            if (currentMode !== 'webrtc') {
+                logDebug('⚠️ Not in WebRTC mode - switching...');
+                switchMode('webrtc');
+            }
+
+            // Show debug log
+            document.getElementById('debug-log').style.display = 'block';
+        }
+
+        function clearDebugLog() {
+            document.getElementById('debug-content').innerHTML = '';
+            document.getElementById('debug-log').style.display = 'none';
+        }
+
+        function logDebug(message) {
+            const debugContent = document.getElementById('debug-content');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
+            debugContent.appendChild(logEntry);
+
+            // Auto-scroll to bottom
+            debugContent.scrollTop = debugContent.scrollHeight;
+
+            // Also log to console
+            console.log(`[WebRTC Debug] ${message}`);
         }
 
 

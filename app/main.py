@@ -238,7 +238,7 @@ def cleanup():
     """Cleanup on shutdown"""
     logger.info("Cleaning up services...")
     try:
-        session_manager.delete_all_sessions()
+        # session_manager.delete_all_sessions()
         logger.info("All sessions cleaned up successfully")
     except Exception as e:
         logger.error(f"Error during cleanup: {e}")
