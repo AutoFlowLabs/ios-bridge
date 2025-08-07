@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.api.websockets.log_handler_ws import handle_log_websocket
 from app.config.settings import settings
 from app.core.logging import logger
 from app.services.video_service import VideoService
@@ -136,6 +137,16 @@ async def screenshot_websocket(websocket: WebSocket, session_id: str):
     except Exception as e:
         logger.error(f"Screenshot WebSocket error for session {session_id}: {e}")
 
+@app.websocket("/ws/{session_id}/logs")
+async def logs_websocket(websocket: WebSocket, session_id: str):
+    """Logs WebSocket endpoint"""
+    try:
+        await handle_log_websocket(websocket, session_id)
+    except WebSocketDisconnect:
+        logger.info(f"Logs WebSocket disconnected for session: {session_id}")
+    except Exception as e:
+        logger.error(f"Logs WebSocket error for session {session_id}: {e}")
+
 # HTTP endpoints
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -237,11 +248,11 @@ async def health_check():
 def cleanup():
     """Cleanup on shutdown"""
     logger.info("Cleaning up services...")
-    try:
-        session_manager.delete_all_sessions()
-        logger.info("All sessions cleaned up successfully")
-    except Exception as e:
-        logger.error(f"Error during cleanup: {e}")
+    # try:
+    #     session_manager.delete_all_sessions()
+    #     logger.info("All sessions cleaned up successfully")
+    # except Exception as e:
+    #     logger.error(f"Error during cleanup: {e}")
 
 atexit.register(cleanup)
 signal.signal(signal.SIGTERM, lambda s, f: cleanup())

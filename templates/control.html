@@ -425,7 +425,691 @@
         .latency-high {
             background-color: #dc3545;
         }
+
+        .btn-install-launch {
+            background-color: #28a745 !important;
+            background: linear-gradient(135deg, #28a745, #20c997) !important;
+            border: none;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-install-launch:hover {
+            background: linear-gradient(135deg, #218838, #1ba085) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.4);
+        }
+
+        .url-input-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .url-input-section input {
+            min-width: 250px;
+        }
+
+        .url-example-btn {
+            background-color: #e9ecef;
+            color: #495057;
+            border: 1px solid #ced4da;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .url-example-btn:hover {
+            background-color: #dee2e6;
+            color: #212529;
+        }
+
+        /* Mobile responsiveness for URL section */
+        @media (max-width: 768px) {
+            .url-input-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .url-input-section input {
+                min-width: auto;
+                width: 100%;
+                margin-bottom: 5px;
+            }
+
+            .url-example-btn {
+                font-size: 10px;
+                padding: 3px 6px;
+            }
+        }
+
+        /* Add these styles to your existing CSS */
+        .section-toggle-icon {
+            float: right;
+            font-size: 14px;
+            transition: transform 0.3s ease;
+            user-select: none;
+        }
+
+        .section-toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .apps-list-section {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+            max-height: 400px;
+            /* Default expanded height */
+            opacity: 1;
+        }
+
+        .apps-list-section.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Enhance app list for better collapsing */
+        .app-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        .apps-list-section.collapsed .app-list {
+            max-height: 0;
+            border: none;
+            padding: 0;
+        }
+
+        /* Add a subtle animation for the count */
+        .app-count {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .apps-list-section.collapsed .app-count {
+            margin: 0;
+            opacity: 0;
+        }
+
+        .device-controls h4 {
+            margin: 0 0 12px 0;
+            color: #333;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .device-controls-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .device-control-btn {
+            padding: 12px 8px;
+            border: none;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #495057;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-height: 60px;
+            justify-content: center;
+        }
+
+        .device-control-btn:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+            transform: translateY(-1px);
+        }
+
+        .device-control-btn:active {
+            transform: translateY(0);
+            background-color: #dee2e6;
+        }
+
+        .device-control-btn .icon {
+            font-size: 18px;
+            margin-bottom: 2px;
+        }
+
+        .device-control-btn .label {
+            font-size: 10px;
+            font-weight: 500;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* Special styling for orientation button when in landscape */
+        .device-control-btn.landscape {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+
+        .device-control-btn.landscape:hover {
+            background-color: #ffeaa7;
+            border-color: #ffdd57;
+        }
+
+        @media (max-width: 768px) {
+            #container {
+                border-radius: 25px;
+                padding: 15px;
+            }
+
+            #container::before {
+                width: 100px;
+                height: 20px;
+                border-radius: 10px;
+                top: 20px;
+            }
+
+            .device-controls-grid {
+                gap: 8px;
+            }
+
+            .device-control-btn {
+                padding: 10px 6px;
+                min-height: 50px;
+            }
+
+            .device-control-btn .icon {
+                font-size: 16px;
+            }
+
+            .device-control-btn .label {
+                font-size: 9px;
+            }
+        }
+
+
+        /* Log Viewer Styles */
+        .logs-section {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+            max-height: 600px;
+            opacity: 1;
+        }
+
+        .logs-section.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .log-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .log-control-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .log-control-row select,
+        .log-control-row input {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .log-control-row select {
+            min-width: 120px;
+        }
+
+        .log-container {
+            height: 400px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #1e1e1e;
+            color: #fff;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 11px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .log-content {
+            height: 100%;
+            overflow-y: auto;
+            padding: 8px;
+            line-height: 1.4;
+        }
+
+        .log-placeholder {
+            text-align: center;
+            color: #888;
+            padding: 50px 20px;
+            font-style: italic;
+        }
+
+        .log-entry {
+            margin-bottom: 2px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-entry.error {
+            background-color: rgba(220, 53, 69, 0.1);
+            border-left: 3px solid #dc3545;
+            color: #ff6b6b;
+        }
+
+        .log-entry.warning {
+            background-color: rgba(255, 193, 7, 0.1);
+            border-left: 3px solid #ffc107;
+            color: #ffeb3b;
+        }
+
+        .log-entry.debug {
+            background-color: rgba(108, 117, 125, 0.1);
+            border-left: 3px solid #6c757d;
+            color: #adb5bd;
+        }
+
+        .log-entry.info {
+            background-color: rgba(0, 123, 255, 0.05);
+            border-left: 3px solid #007bff;
+            color: #e0e0e0;
+        }
+
+        .log-timestamp {
+            color: #6c757d;
+            font-size: 10px;
+        }
+
+        .log-process {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .log-message {
+            margin-left: 8px;
+        }
+
+        .log-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            font-size: 10px;
+            color: #666;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .streaming {
+            background-color: #28a745 !important;
+        }
+
+        .streaming:hover {
+            background-color: #218838 !important;
+        }
+
+        @media (max-width: 768px) {
+            .log-control-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .log-control-row select,
+            .log-control-row input {
+                width: 100%;
+                margin-bottom: 4px;
+            }
+
+            .log-container {
+                height: 300px;
+            }
+
+            /* Add these styles to your existing CSS in control.html */
+
+            /* Location Controls Styles */
+            .location-section {
+                transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+                overflow: hidden;
+                max-height: 500px;
+                opacity: 1;
+            }
+
+            .location-section.collapsed {
+                max-height: 0;
+                opacity: 0;
+                margin: 0;
+                padding: 0;
+            }
+
+            .current-location {
+                background: #f8f9fa;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 10px;
+                margin-bottom: 15px;
+            }
+
+            .location-status {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .location-controls {
+                margin-bottom: 15px;
+            }
+
+            .location-input-row {
+                display: flex;
+                gap: 10px;
+                align-items: end;
+                flex-wrap: wrap;
+            }
+
+            .coordinate-input {
+                display: flex;
+                flex-direction: column;
+                min-width: 120px;
+            }
+
+            .coordinate-input label {
+                font-size: 11px;
+                margin-bottom: 3px;
+                font-weight: bold;
+            }
+
+            .coordinate-input input {
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+
+            .location-presets h4 {
+                margin: 0 0 10px 0;
+                font-size: 13px;
+                color: #666;
+            }
+
+
+            @media (max-width: 768px) {
+                .location-input-row {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+
+                .coordinate-input {
+                    min-width: auto;
+                }
+
+            }
+
+            /* Add to your existing CSS in control.html */
+
+            .predefined-locations {
+                margin-top: 15px;
+            }
+
+            .predefined-locations h4 {
+                margin: 0 0 10px 0;
+                font-size: 13px;
+                color: #666;
+            }
+
+            .predefined-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 8px;
+                max-height: 150px;
+                overflow-y: auto;
+            }
+
+            .predefined-btn {
+                background: #e3f2fd;
+                border: 1px solid #90caf9;
+            }
+
+            .predefined-btn:hover {
+                background: #bbdefb;
+                border-color: #64b5f6;
+            }
+
+            /* Add these updated styles to your control.html CSS section */
+
+            /* Location Controls Styles - Simplified */
+            .location-section {
+                transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+                overflow: hidden;
+                max-height: 600px;
+                opacity: 1;
+            }
+
+            .location-section.collapsed {
+                max-height: 0;
+                opacity: 0;
+                margin: 0;
+                padding: 0;
+            }
+
+            .current-location {
+                background: #f8f9fa;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 10px;
+                margin-bottom: 15px;
+            }
+
+            .location-status {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .location-controls {
+                margin-bottom: 15px;
+            }
+
+            .location-input-row {
+                display: flex;
+                gap: 10px;
+                align-items: end;
+                flex-wrap: wrap;
+                margin-bottom: 10px;
+            }
+
+            .coordinate-input {
+                display: flex;
+                flex-direction: column;
+                min-width: 120px;
+            }
+
+            .coordinate-input label {
+                font-size: 11px;
+                margin-bottom: 3px;
+                font-weight: bold;
+            }
+
+            .coordinate-input input {
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+
+            .coordinate-input input:not(:placeholder-shown) {
+                background-color: #e8f5e8;
+                border-color: #28a745;
+            }
+
+            .coordinate-input input:focus {
+                border-color: #007bff;
+                box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+            }
+
+            .location-name-display {
+                padding: 8px;
+                background: #e8f5e8;
+                border: 1px solid #c3e6c3;
+                border-radius: 4px;
+                font-size: 12px;
+                color: #2d5a2d;
+                margin-top: 8px;
+            }
+
+            .predefined-locations h4 {
+                margin: 0 0 10px 0;
+                font-size: 13px;
+                color: #666;
+                user-select: none;
+            }
+
+            /* Add/update these styles in your CSS section */
+
+            .predefined-locations-list {
+                max-height: 300px;
+                overflow-y: auto;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background: #f8f9fa;
+                transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+                opacity: 1;
+                padding: 0;
+            }
+
+            .predefined-locations-list.collapsed {
+                max-height: 0 !important;
+                opacity: 0 !important;
+                border: none !important;
+                overflow: hidden !important;
+                padding: 0 !important;
+            }
+
+            .predefined-item {
+                padding: 8px 12px;
+                border-bottom: 1px solid #eee;
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                transition: background 0.2s;
+            }
+
+            .predefined-item:last-child {
+                border-bottom: none;
+            }
+
+            .predefined-item:hover {
+                background: #e9ecef;
+            }
+
+            .predefined-name {
+                font-weight: bold;
+                font-size: 12px;
+                color: #333;
+            }
+
+            .predefined-coords {
+                font-size: 10px;
+                color: #666;
+                font-family: monospace;
+            }
+
+            .predefined-loading {
+                text-align: center;
+                color: #666;
+                font-style: italic;
+                padding: 20px;
+                font-size: 12px;
+            }
+
+            /* Enhanced toggle icon animation */
+            .predefined-toggle-icon {
+                float: right;
+                font-size: 12px;
+                transition: transform 0.3s ease;
+                display: inline-block;
+            }
+
+            .predefined-toggle-icon.collapsed {
+                transform: rotate(-90deg);
+            }
+
+            @media (max-width: 768px) {
+                .location-input-row {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+
+                .coordinate-input {
+                    min-width: auto;
+                }
+            }
+
+            .predefined-item.selected {
+                background: #28a745 !important;
+                color: white !important;
+                transform: scale(1.02);
+            }
+
+            .predefined-item:active {
+                transform: scale(0.98);
+            }
+
+            /* Add a subtle animation */
+            .predefined-item {
+                transition: all 0.2s ease;
+            }
+
+
+        }
     </style>
+    <script src="/static/js/logs.js" onerror="console.error('Failed to load logs.js')"></script>
+    <script src="/static/js/location.js" onerror="console.error('Failed to load location.js')"></script>
+
 </head>
 
 <body>
@@ -441,8 +1125,11 @@
             <div id="status" class="disconnected">Connecting...</div>
 
             <div id="container">
-                <canvas id="screen" width="400" height="600"></canvas>
-                <video id="webrtc-video" style="display: none;" autoplay playsinline muted></video>
+                <div class="screen-container">
+                    <canvas id="screen" width="400" height="600"></canvas>
+                    <video id="webrtc-video" style="display: none;" autoplay playsinline muted></video>
+                </div>
+
                 <div class="simulator-info">
                     <div id="dimensionInfo">Loading simulator dimensions...</div>
                     <div class="stream-quality">
@@ -451,8 +1138,28 @@
                     </div>
                 </div>
             </div>
-        </div>
 
+            <!-- Device Controls Section -->
+            <div class="device-controls">
+                <h4>📱 Device Controls</h4>
+                <div class="device-controls-grid">
+                    <button class="device-control-btn" onclick="takeDeviceScreenshot()" id="screenshotBtn">
+                        <span class="icon">📸</span>
+                        <span class="label">Screenshot</span>
+                    </button>
+
+                    <button class="device-control-btn" onclick="pressHomeButton()" id="homeBtn">
+                        <span class="icon">🏠</span>
+                        <span class="label">Home Button</span>
+                    </button>
+
+                    <button class="device-control-btn" onclick="toggleOrientation()" id="orientationBtn">
+                        <span class="icon">🔄</span>
+                        <span class="label">Portrait</span>
+                    </button>
+                </div>
+            </div>
+        </div>
         <!-- Controls Panel -->
         <div class="controls-panel">
             <div class="controls-section">
@@ -479,22 +1186,220 @@
 
             <!-- App Management Section -->
             <div class="controls-section">
-                <h3>📱 App Management</h3>
+                <h3 onclick="toggleAppsSection()" style="cursor: pointer;">
+                    📱 App Management
+                    <span id="appsToggleIcon" class="section-toggle-icon">▼</span>
+                </h3>
 
-                <!-- App Upload -->
                 <div class="app-upload-section">
-                    <input type="file" id="ipaFile" accept=".ipa" placeholder="Select IPA file...">
-                    <button onclick="installApp()" class="btn-app-launch">📦 Install</button>
+                    <input type="file" id="ipaFile" accept=".ipa" placeholder="Select IPA file..."
+                        style="display: none;">
+                    <input type="file" id="appBundle" accept=".zip" placeholder="Select APP bundle ZIP..."
+                        style="display: none;">
+                    <button onclick="selectAppType('ipa')" class="btn-app-launch">📱 Select IPA</button>
+                    <button onclick="selectAppType('zip')" class="btn-app-launch">📦 Select APP Bundle ZIP</button>
+
+                    <div class="install-options" style="position: relative; display: inline-block;">
+                        <button onclick="toggleInstallOptions()" class="btn-app-launch">🚀 Install Options ▼</button>
+                        <div id="installDropdown" class="install-dropdown"
+                            style="display: none; position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 1000; min-width: 160px; top: 100%;">
+                            <button onclick="installApp(); hideInstallOptions();"
+                                style="width: 100%; text-align: left; border: none; background: none; padding: 8px 12px; cursor: pointer;">🚀
+                                Install Only</button>
+                            <button onclick="installAndLaunchApp(); hideInstallOptions();"
+                                style="width: 100%; text-align: left; border: none; background: none; padding: 8px 12px; cursor: pointer; border-top: 1px solid #eee;">🚀▶️
+                                Install & Launch</button>
+                        </div>
+                    </div>
+
                     <button onclick="refreshApps()" class="btn-primary">🔄 Refresh</button>
+                    <div id="selectedFileName" style="font-size: 12px; color: #666; margin-top: 5px;"></div>
+                    <div style="font-size: 11px; color: #999; margin-top: 3px;">
+                        For APP bundles: First zip your .app bundle, then select the ZIP file
+                    </div>
                 </div>
 
-                <!-- App List -->
-                <div class="app-count" id="appCount">Loading apps...</div>
-                <div class="app-list" id="appList">
-                    <div class="no-apps">Loading installed apps...</div>
+                <!-- Collapsible App List Section -->
+                <div id="appsListSection" class="apps-list-section">
+                    <div class="app-count" id="appCount">Loading apps...</div>
+                    <div class="app-list" id="appList">
+                        <div class="no-apps">Loading installed apps...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="controls-section">
+                <h3>🌐 URL & Deep Links</h3>
+
+                <div class="url-input-section">
+                    <input type="text" id="urlInput" placeholder="Enter URL or deep link..."
+                        style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                    <button onclick="openUrl()" class="btn-app-launch" style="flex-shrink: 0;">🌐 Open URL</button>
+                    <button onclick="showUrlExamples()" class="btn-primary" style="flex-shrink: 0;">💡 Examples</button>
+                </div>
+
+                <div id="urlExamples"
+                    style="display: none; margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 12px;">
+                    <strong>Examples:</strong><br>
+                    <div style="margin: 5px 0;">
+                        <button onclick="fillUrlExample('https://www.apple.com')" class="url-example-btn">🌐 Apple
+                            Website</button>
+                        <button onclick="fillUrlExample('https://www.google.com')" class="url-example-btn">🔍
+                            Google</button>
+                        <button onclick="fillUrlExample('mailto:test@example.com')" class="url-example-btn">📧
+                            Email</button>
+                    </div>
+                    <div style="margin: 5px 0;">
+                        <button onclick="fillUrlExample('tel:+1234567890')" class="url-example-btn">📞 Phone</button>
+                        <button onclick="fillUrlExample('sms:+1234567890')" class="url-example-btn">💬 SMS</button>
+                        <button onclick="fillUrlExample('maps:?q=Apple Park')" class="url-example-btn">🗺️ Maps</button>
+                    </div>
+                    <div style="margin: 5px 0;">
+                        <button onclick="fillUrlExample('settings:root=General')" class="url-example-btn">⚙️
+                            Settings</button>
+                        <button onclick="fillUrlExample('facetime:+1234567890')" class="url-example-btn">📹
+                            FaceTime</button>
+                        <button onclick="fillUrlExample('shortcuts:')" class="url-example-btn">⚡ Shortcuts</button>
+                    </div>
+                    <div style="font-size: 10px; color: #666; margin-top: 8px;">
+                        💡 Tip: You can also open custom app URL schemes if the app supports them
+                    </div>
                 </div>
             </div>
 
+            <div class="controls-section">
+                <h3>⌨️ Text Input</h3>
+                <div class="text-input-section">
+                    <input type="text" id="textInput" placeholder="Enter text to type..." maxlength="200">
+                    <button onclick="sendText()">📤 Send</button>
+                    <button onclick="clearText()">🗑️ Clear</button>
+                </div>
+            </div>
+
+
+            <div class="controls-section gesture-buttons">
+                <h3>👆 Gesture Controls</h3>
+                <div class="controls-grid-wide">
+                    <button id="swipeToggle" onclick="toggleSwipeMode()">✋ Enable Swipe Mode</button>
+                </div>
+
+                <br>
+
+                <div class="controls-grid">
+                    <button onclick="quickSwipe('up')">⬆️ Up</button>
+                    <button onclick="quickSwipe('down')">⬇️ Down</button>
+                    <button onclick="quickSwipe('left')">⬅️ Left</button>
+                    <button onclick="quickSwipe('right')">➡️ Right</button>
+                </div>
+            </div>
+
+            <!-- Replace the existing location section with this simplified version -->
+
+            <div class="controls-section">
+                <h3 onclick="toggleLocationSection()" style="cursor: pointer;">
+                    📍 Mock Location
+                    <span id="locationToggleIcon" class="section-toggle-icon">▼</span>
+                </h3>
+
+                <div id="locationSection" class="location-section">
+                    <!-- Current Location Display -->
+                    <div class="current-location">
+                        <div class="location-status" id="locationStatus">
+                            <span id="currentLocationText">No location set</span>
+                            <button onclick="clearLocation()" id="clearLocationBtn" class="btn-secondary"
+                                style="display: none;">Clear</button>
+                        </div>
+                    </div>
+
+                    <!-- Location Input -->
+                    <div class="location-controls">
+                        <div class="location-input-row">
+                            <div class="coordinate-input">
+                                <label for="latitudeInput">Latitude:</label>
+                                <input type="number" id="latitudeInput" placeholder="37.7749" step="any" min="-90"
+                                    max="90">
+                            </div>
+                            <div class="coordinate-input">
+                                <label for="longitudeInput">Longitude:</label>
+                                <input type="number" id="longitudeInput" placeholder="-122.4194" step="any" min="-180"
+                                    max="180">
+                            </div>
+                            <button onclick="setCustomLocation()" class="btn-primary">📍 Set Location</button>
+                            <button onclick="getCurrentCoordinates()" class="btn-secondary">📱 Current</button>
+                        </div>
+
+                        <!-- Location Name Display -->
+                        <div id="locationNameDisplay" class="location-name-display" style="display: none;">
+                            <span id="locationNameText"></span>
+                        </div>
+                    </div>
+
+                    <!-- Predefined Locations (Collapsible) -->
+                    <div class="predefined-locations">
+                        <h4 onclick="togglePredefinedLocations()" style="cursor: pointer;">
+                            🌍 Predefined Locations
+                            <span id="predefinedToggleIcon" class="predefined-toggle-icon">▼</span>
+                        </h4>
+                        <div id="predefinedLocationsList" class="predefined-locations-list">
+                            <div class="predefined-loading">Loading locations...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="controls-section">
+                <h3 onclick="toggleLogsSection()" style="cursor: pointer;">
+                    📋 Device Logs
+                    <span id="logsToggleIcon" class="section-toggle-icon">▼</span>
+                </h3>
+
+                <div id="logsSection" class="logs-section">
+                    <!-- Log Controls -->
+                    <div class="log-controls">
+                        <div class="log-control-row">
+                            <select id="logLevel" onchange="applyLogFilter()">
+                                <option value="all">All Levels</option>
+                                <option value="debug">Debug</option>
+                                <option value="info">Info</option>
+                                <option value="warning">Warning</option>
+                                <option value="error">Error</option>
+                            </select>
+
+                            <select id="logProcess" onchange="applyLogFilter()">
+                                <option value="">All Processes</option>
+                            </select>
+
+                            <button onclick="clearLogs()" class="btn-secondary">🗑️ Clear</button>
+                            <button onclick="toggleLogStream()" id="logStreamBtn" class="btn-primary">▶️ Start
+                                Stream</button>
+                            <button onclick="exportLogs()" class="btn-secondary">💾 Export</button>
+                        </div>
+
+                        <div class="log-control-row">
+                            <input type="text" id="logSearch" placeholder="Search logs..."
+                                onkeyup="filterDisplayedLogs()" style="flex: 1;">
+                            <button onclick="scrollToBottom()" class="btn-secondary">⬇️ Bottom</button>
+                            <button onclick="toggleAutoScroll()" id="autoScrollBtn" class="btn-secondary">📌
+                                Auto-scroll</button>
+                        </div>
+                    </div>
+
+                    <!-- Log Display -->
+                    <div id="logContainer" class="log-container">
+                        <div id="logContent" class="log-content">
+                            <div class="log-placeholder">
+                                📋 Device logs will appear here<br>
+                                <small>Click "Start Stream" to begin real-time logging</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Log Status -->
+                    <div class="log-status" id="logStatus">
+                        <span id="logCount">0 logs</span> |
+                        <span id="logRate">0 logs/sec</span> |
+                        <span id="connectionStatus">Disconnected</span>
+                    </div>
+                </div>
+            </div>
             <div class="controls-section system-controls">
                 <h3>🎮 System Controls</h3>
                 <div class="controls-grid">
@@ -519,30 +1424,7 @@
                 </div>
             </div>
 
-            <div class="controls-section gesture-buttons">
-                <h3>👆 Gesture Controls</h3>
-                <div class="controls-grid-wide">
-                    <button id="swipeToggle" onclick="toggleSwipeMode()">✋ Enable Swipe Mode</button>
-                </div>
 
-                <br>
-
-                <div class="controls-grid">
-                    <button onclick="quickSwipe('up')">⬆️ Up</button>
-                    <button onclick="quickSwipe('down')">⬇️ Down</button>
-                    <button onclick="quickSwipe('left')">⬅️ Left</button>
-                    <button onclick="quickSwipe('right')">➡️ Right</button>
-                </div>
-            </div>
-
-            <div class="controls-section">
-                <h3>⌨️ Text Input</h3>
-                <div class="text-input-section">
-                    <input type="text" id="textInput" placeholder="Enter text to type..." maxlength="200">
-                    <button onclick="sendText()">📤 Send</button>
-                    <button onclick="clearText()">🗑️ Clear</button>
-                </div>
-            </div>
 
             <div class="controls-section">
                 <h3>⌨️ Keyboard Shortcuts</h3>
@@ -551,12 +1433,16 @@
                     <strong>H</strong>=Home, <strong>L</strong>=Lock, <strong>S</strong>=Siri,
                     <strong>P</strong>=Pay<br>
                     <strong>+/-</strong>=Volume, <strong>K</strong>=Shake, <strong>Space</strong>=Toggle Swipe<br>
-                    <strong>Arrow Keys</strong>=Quick Swipes, <strong>Enter</strong>=Send Text
+                    <strong>Arrow Keys</strong>=Quick Swipes, <strong>Enter</strong>=Send Text<br>
+                    <strong>U</strong>=Focus URL Input, <strong>A</strong>=Toggle Apps List<br>
+                    <strong>X</strong>=Screenshot, <strong>R</strong>=Rotate, <strong>Home</strong>=Home Button<br>
+                    <strong>G</strong>=Toggle Logs, <strong>L</strong>=Toggle Location, <strong>Escape</strong>=Stop Log
+                    Stream
                 </div>
             </div>
         </div>
     </div>
-
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script>
         // Pass session_id to JavaScript
         const SESSION_ID = '{{ session_id }}';
@@ -614,6 +1500,168 @@
         // App management
         let installedApps = [];
 
+        let currentOrientation = 'portrait'; // 'portrait' or 'landscape'
+        let isCapturingScreenshot = false;
+
+        window.deviceLogsManager = null;
+
+        // Function to check if DeviceLogsManager is available and initialize it
+        function checkAndInitializeLogsManager() {
+            console.log('Checking DeviceLogsManager availability...');
+
+            if (typeof DeviceLogsManager !== 'undefined') {
+                console.log('✅ DeviceLogsManager found, initializing...');
+
+                // Initialize the logs manager
+                window.deviceLogsManager = new DeviceLogsManager(SESSION_ID);
+                console.log('DeviceLogsManager created:', window.deviceLogsManager);
+
+                window.deviceLogsManager.initialize().then(() => {
+                    console.log('✅ DeviceLogsManager initialized successfully');
+                }).catch(error => {
+                    console.error('❌ Failed to initialize DeviceLogsManager:', error);
+                    showTemporaryStatus('❌ Log viewer initialization failed');
+                });
+
+                return true;
+            } else {
+                console.log('❌ DeviceLogsManager not found');
+                return false;
+            }
+        }
+
+        async function takeDeviceScreenshot() {
+            if (isCapturingScreenshot) return;
+
+            const screenshotBtn = document.getElementById('screenshotBtn');
+            const originalContent = screenshotBtn.innerHTML;
+
+            try {
+                isCapturingScreenshot = true;
+                screenshotBtn.innerHTML = '<span class="icon">⏳</span><span class="label">Capturing...</span>';
+                screenshotBtn.disabled = true;
+
+                showTemporaryStatus('📸 Capturing screenshot...');
+
+                // Generate filename with timestamp
+                const timestamp = new Date().getTime();
+                const filename = `screenshot_${SESSION_ID.substring(0, 8)}_${timestamp}.png`;
+
+                // Create a form to submit the request
+                const formData = new FormData();
+                formData.append('filename', filename);
+
+                // Make the request to download screenshot endpoint
+                const response = await fetch(`/api/sessions/${SESSION_ID}/screenshot/download`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    // Get the blob from response
+                    const blob = await response.blob();
+
+                    // Create a download link
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = downloadUrl;
+                    downloadLink.download = filename;
+
+                    // Trigger the download
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+
+                    // Clean up
+                    document.body.removeChild(downloadLink);
+                    window.URL.revokeObjectURL(downloadUrl);
+
+                    showTemporaryStatus(`✅ Screenshot downloaded: ${filename}`);
+
+                    // Flash effect
+                    document.body.style.backgroundColor = 'white';
+                    setTimeout(() => {
+                        document.body.style.backgroundColor = '#f5f5f5';
+                    }, 100);
+
+                } else {
+                    const errorData = await response.json();
+                    showTemporaryStatus(`❌ Screenshot failed: ${errorData.detail || 'Unknown error'}`);
+                }
+
+            } catch (error) {
+                console.error('Screenshot error:', error);
+                showTemporaryStatus('❌ Screenshot failed: ' + error.message);
+            } finally {
+                isCapturingScreenshot = false;
+                screenshotBtn.innerHTML = originalContent;
+                screenshotBtn.disabled = false;
+            }
+        }
+
+        function pressHomeButton() {
+            const homeBtn = document.getElementById('homeBtn');
+
+            // Visual feedback
+            homeBtn.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                homeBtn.style.transform = 'scale(1)';
+            }, 150);
+
+            // Send home button press
+            pressButton('home');
+        }
+
+        async function toggleOrientation() {
+            const orientationBtn = document.getElementById('orientationBtn');
+            const container = document.getElementById('container');
+
+            try {
+                showTemporaryStatus('🔄 Changing orientation...');
+
+                // Toggle orientation
+                const newOrientation = currentOrientation === 'portrait' ? 'landscape' : 'portrait';
+
+                // Create FormData instead of JSON
+                const formData = new FormData();
+                formData.append('orientation', newOrientation);
+
+                const response = await fetch(`/api/sessions/${SESSION_ID}/orientation`, {
+                    method: 'POST',
+                    body: formData  // Send as FormData, not JSON
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentOrientation = newOrientation;
+                    updateOrientationUI();
+                    showTemporaryStatus(`✅ Orientation changed to ${newOrientation}`);
+                } else {
+                    showTemporaryStatus(`❌ Orientation change failed: ${data.message || 'Unknown error'}`);
+                }
+
+            } catch (error) {
+                console.error('Orientation change error:', error);
+                showTemporaryStatus('❌ Orientation change failed: ' + error.message);
+            }
+        }
+
+        function updateOrientationUI() {
+            const orientationBtn = document.getElementById('orientationBtn');
+            const container = document.getElementById('container');
+
+            if (currentOrientation === 'landscape') {
+                orientationBtn.innerHTML = '<span class="icon">📱</span><span class="label">Landscape</span>';
+                orientationBtn.classList.add('landscape');
+                container.style.transform = 'rotate(0deg)'; // You can add rotation animation if desired
+            } else {
+                orientationBtn.innerHTML = '<span class="icon">🔄</span><span class="label">Portrait</span>';
+                orientationBtn.classList.remove('landscape');
+                container.style.transform = 'rotate(0deg)';
+            }
+        }
+
+
         init();
 
         function init() {
@@ -621,7 +1669,70 @@
             setupKeyboardShortcuts();
             switchMode('video');
             loadInstalledApps();
+            loadAppsListState();
+            // Initialize logs and location
+            setTimeout(() => {
+                initLogViewer();
+                initLocationControls();
+            }, 500);
         }
+
+        // Function to initialize log viewer
+        function initLogViewer() {
+            console.log('initLogViewer called...');
+
+            // Try to initialize immediately
+            if (checkAndInitializeLogsManager()) {
+                return;
+            }
+
+            // If not available, wait a bit and try again
+            let retryCount = 0;
+            const maxRetries = 10;
+
+            const retryInit = () => {
+                retryCount++;
+                console.log(`Retry ${retryCount}/${maxRetries} to initialize logs manager`);
+
+                if (checkAndInitializeLogsManager()) {
+                    console.log('✅ Logs manager initialized after retry');
+                    return;
+                }
+
+                if (retryCount < maxRetries) {
+                    setTimeout(retryInit, 100);
+                } else {
+                    console.error('❌ Failed to initialize logs manager after all retries');
+                    showTemporaryStatus('❌ Log viewer failed to load - check console');
+                }
+            };
+
+            setTimeout(retryInit, 100);
+        }
+
+        function testWebSocketConnection() {
+            console.log('Testing WebSocket connection to logs endpoint');
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/${SESSION_ID}/logs`;
+
+            console.log('WebSocket URL:', wsUrl);
+
+            const testWs = new WebSocket(wsUrl);
+
+            testWs.onopen = () => {
+                console.log('✅ WebSocket connection successful');
+                testWs.close();
+            };
+
+            testWs.onerror = (error) => {
+                console.error('❌ WebSocket connection failed:', error);
+            };
+
+            testWs.onclose = (event) => {
+                console.log('WebSocket closed:', event.code, event.reason);
+            };
+        }
+
 
         // App Management Functions
         async function loadInstalledApps() {
@@ -675,20 +1786,75 @@
             `).join('');
         }
 
-        async function installApp() {
-            const fileInput = document.getElementById('ipaFile');
-            const file = fileInput.files[0];
+        // Add to your control.html JavaScript section
+        let selectedFileType = 'ipa';
+        function selectAppType(type) {
+            selectedFileType = type;
+            const ipaInput = document.getElementById('ipaFile');
+            const appInput = document.getElementById('appBundle');
+            const fileNameDiv = document.getElementById('selectedFileName');
 
-            if (!file) {
-                showTemporaryStatus('Please select an IPA file');
+            // Clear previous selection
+            ipaInput.value = '';
+            appInput.value = '';
+            fileNameDiv.textContent = '';
+
+            if (type === 'ipa') {
+                // For IPA files - single file selection
+                ipaInput.click();
+
+                ipaInput.onchange = () => {
+                    if (ipaInput.files.length > 0) {
+                        fileNameDiv.textContent = `Selected: ${ipaInput.files[0].name}`;
+                    }
+                };
+            } else if (type === 'zip') {
+                // For ZIP files containing .app bundles
+                appInput.click();
+
+                appInput.onchange = () => {
+                    if (appInput.files.length > 0) {
+                        fileNameDiv.textContent = `Selected: ${appInput.files[0].name}`;
+                    }
+                };
+            }
+        }
+        // Replace the installApp function around line 755
+        async function installApp() {
+            const ipaInput = document.getElementById('ipaFile');
+            const appInput = document.getElementById('appBundle');
+
+            let file, fileType;
+
+            if (selectedFileType === 'ipa') {
+                if (!ipaInput.files || ipaInput.files.length === 0) {
+                    showTemporaryStatus('Please select an IPA file');
+                    return;
+                }
+                file = ipaInput.files[0];
+                fileType = 'ipa';
+            } else if (selectedFileType === 'zip') {
+                if (!appInput.files || appInput.files.length === 0) {
+                    showTemporaryStatus('Please select a ZIP file');
+                    return;
+                }
+                file = appInput.files[0];
+                fileType = 'zip';
+            } else {
+                showTemporaryStatus('Please select a file');
                 return;
             }
 
             const formData = new FormData();
-            formData.append('ipa_file', file);
+
+            if (fileType === 'ipa') {
+                formData.append('ipa_file', file);
+            } else {
+                formData.append('app_bundle', file); // ZIP file containing .app bundle
+            }
 
             try {
-                showTemporaryStatus('Installing app...');
+                showTemporaryStatus(`Installing ${fileType.toUpperCase()} file...`);
                 const response = await fetch(`/api/sessions/${SESSION_ID}/apps/install`, {
                     method: 'POST',
                     body: formData
@@ -698,14 +1864,76 @@
 
                 if (data.success) {
                     showTemporaryStatus('App installed successfully!');
-                    fileInput.value = ''; // Clear file input
-                    loadInstalledApps(); // Refresh app list
+                    // Clear file inputs
+                    ipaInput.value = '';
+                    appInput.value = '';
+                    document.getElementById('selectedFileName').textContent = '';
+                    loadInstalledApps();
                 } else {
-                    showTemporaryStatus('Failed to install app: ' + (data.detail || 'Unknown error'));
+                    showTemporaryStatus('Failed to install app: ' + (data.message || data.detail || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Failed to install app:', error);
                 showTemporaryStatus('Failed to install app: ' + error.message);
+            }
+        }
+
+        // Add this function after the existing installApp function
+        async function installAndLaunchApp() {
+            const ipaInput = document.getElementById('ipaFile');
+            const appInput = document.getElementById('appBundle');
+
+            let file, fileType;
+
+            if (selectedFileType === 'ipa') {
+                if (!ipaInput.files || ipaInput.files.length === 0) {
+                    showTemporaryStatus('Please select an IPA file');
+                    return;
+                }
+                file = ipaInput.files[0];
+                fileType = 'ipa';
+            } else if (selectedFileType === 'zip') {
+                if (!appInput.files || appInput.files.length === 0) {
+                    showTemporaryStatus('Please select a ZIP file');
+                    return;
+                }
+                file = appInput.files[0];
+                fileType = 'zip';
+            } else {
+                showTemporaryStatus('Please select a file');
+                return;
+            }
+
+            const formData = new FormData();
+
+            if (fileType === 'ipa') {
+                formData.append('ipa_file', file);
+            } else {
+                formData.append('app_bundle', file);
+            }
+
+            try {
+                showTemporaryStatus(`Installing and launching ${fileType.toUpperCase()} file...`);
+                const response = await fetch(`/api/sessions/${SESSION_ID}/apps/install-and-launch`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showTemporaryStatus(`App installed and launched successfully! Bundle ID: ${data.bundle_id || 'Unknown'}`);
+                    // Clear file inputs
+                    ipaInput.value = '';
+                    appInput.value = '';
+                    document.getElementById('selectedFileName').textContent = '';
+                    loadInstalledApps();
+                } else {
+                    showTemporaryStatus('Failed to install and launch app: ' + (data.message || data.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to install and launch app:', error);
+                showTemporaryStatus('Failed to install and launch app: ' + error.message);
             }
         }
 
@@ -723,6 +1951,24 @@
                 showTemporaryStatus('Failed to launch app');
             }
         }
+
+        function toggleInstallOptions() {
+            const dropdown = document.getElementById('installDropdown');
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function hideInstallOptions() {
+            document.getElementById('installDropdown').style.display = 'none';
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function (event) {
+            const dropdown = document.getElementById('installDropdown');
+            const button = event.target.closest('.install-options');
+            if (!button && dropdown.style.display === 'block') {
+                dropdown.style.display = 'none';
+            }
+        });
 
         async function terminateApp(bundleId) {
             try {
@@ -772,8 +2018,17 @@
 
         function setupKeyboardShortcuts() {
             document.addEventListener('keydown', (e) => {
-                if (e.target === textInput) return; // Don't interfere with text input
+                if (e.target !== textInput && e.target !== document.getElementById('urlInput') &&
+                    e.target !== document.getElementById('logSearch') &&
+                    e.target !== document.getElementById('latitudeInput') &&
+                    e.target !== document.getElementById('longitudeInput')) {
 
+                    // Let the logs manager handle its shortcuts first
+                    if (window.deviceLogsManager && window.deviceLogsManager.handleKeyboardShortcut(e.key)) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
                 switch (e.key) {
                     case 'w': switchMode('webrtc'); break;
                     case 'v': switchMode('video'); break;
@@ -790,6 +2045,15 @@
                     case 'ArrowLeft': e.preventDefault(); quickSwipe('left'); break;
                     case 'ArrowRight': e.preventDefault(); quickSwipe('right'); break;
                     case ' ': e.preventDefault(); toggleSwipeMode(); break;
+
+                    case 'x': e.preventDefault(); takeDeviceScreenshot(); break;
+                    case 'Home': e.preventDefault(); pressHomeButton(); break;
+                    case 'r': e.preventDefault(); toggleOrientation(); break;
+                    case 'a': e.preventDefault(); toggleAppsSection(); break;
+                    case 'l': // L for location
+                        e.preventDefault();
+                        toggleLocationSection();
+                        break;
                 }
             });
 
@@ -800,6 +2064,12 @@
                 }
             });
         }
+
+        window.addEventListener('beforeunload', () => {
+            if (window.deviceLogsManager) {
+                window.deviceLogsManager.cleanup();
+            }
+        });
 
 
         function setupControlWebSocket() {
@@ -969,14 +2239,15 @@
 
         function updateCanvasOptimized(img, data) {
             // Calculate display size with better performance
-            const containerWidth = canvas.parentElement.clientWidth - 24;
-            const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for performance
+            const screenContainer = document.querySelector('.screen-container');
+            const containerWidth = screenContainer.clientWidth - 4; // Account for border
+            const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
             const aspectRatio = pixelWidth / pixelHeight;
 
-            let displayWidth = Math.min(containerWidth, 450);
+            let displayWidth = Math.min(containerWidth, 400);
             let displayHeight = displayWidth / aspectRatio;
 
-            const maxHeight = window.innerHeight * 0.7;
+            const maxHeight = window.innerHeight * 0.6;
             if (displayHeight > maxHeight) {
                 displayHeight = maxHeight;
                 displayWidth = displayHeight * aspectRatio;
@@ -1436,28 +2707,26 @@
         function resizeWebRTCVideo() {
             if (!webrtcVideo.videoWidth || !webrtcVideo.videoHeight) return;
 
-            const containerWidth = webrtcVideo.parentElement.clientWidth - 24; // Account for padding
+            const screenContainer = document.querySelector('.screen-container');
+            const containerWidth = screenContainer.clientWidth - 4;
             const videoAspectRatio = webrtcVideo.videoWidth / webrtcVideo.videoHeight;
 
-            // Calculate display size similar to canvas sizing
-            let displayWidth = Math.min(containerWidth, 450);
+            let displayWidth = Math.min(containerWidth, 400);
             let displayHeight = displayWidth / videoAspectRatio;
 
-            const maxHeight = window.innerHeight * 0.7;
+            const maxHeight = window.innerHeight * 0.6;
             if (displayHeight > maxHeight) {
                 displayHeight = maxHeight;
                 displayWidth = displayHeight * videoAspectRatio;
             }
 
-            // Apply the calculated size
             webrtcVideo.style.width = Math.round(displayWidth) + 'px';
             webrtcVideo.style.height = Math.round(displayHeight) + 'px';
             webrtcVideo.style.maxWidth = '100%';
-            webrtcVideo.style.maxHeight = '70vh';
+            webrtcVideo.style.maxHeight = '60vh';
 
             console.log(`WebRTC video sized: ${displayWidth}x${displayHeight}`);
         }
-
         function enhanceSDPForQuality(offer) {
             let sdp = offer.sdp;
 
@@ -1732,6 +3001,200 @@
             });
         }
 
+        // Add these functions to your existing JavaScript section
+
+        async function openUrl() {
+            const urlInput = document.getElementById('urlInput');
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                showTemporaryStatus('Please enter a URL');
+                return;
+            }
+
+            try {
+                showTemporaryStatus(`Opening URL: ${url}`);
+
+                const formData = new FormData();
+                formData.append('url', url);
+
+                const response = await fetch(`/api/sessions/${SESSION_ID}/url/open`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showTemporaryStatus(`✅ URL opened successfully: ${url}`);
+                    // Don't clear the input in case user wants to try variations
+                } else {
+                    showTemporaryStatus(`❌ Failed to open URL: ${data.message || 'Unknown error'}`);
+                }
+
+            } catch (error) {
+                console.error('Failed to open URL:', error);
+                showTemporaryStatus(`❌ Failed to open URL: ${error.message}`);
+            }
+        }
+
+        function showUrlExamples() {
+            const examplesDiv = document.getElementById('urlExamples');
+            if (examplesDiv.style.display === 'none') {
+                examplesDiv.style.display = 'block';
+            } else {
+                examplesDiv.style.display = 'none';
+            }
+        }
+
+        function fillUrlExample(exampleUrl) {
+            const urlInput = document.getElementById('urlInput');
+            urlInput.value = exampleUrl;
+            urlInput.focus();
+
+            // Hide examples after selection
+            document.getElementById('urlExamples').style.display = 'none';
+        }
+
+        // Add keyboard shortcut for URL opening
+        document.addEventListener('keydown', (e) => {
+            const urlInput = document.getElementById('urlInput');
+
+            // If URL input is focused and Enter is pressed, open the URL
+            if (e.target === urlInput && e.key === 'Enter') {
+                openUrl();
+                e.preventDefault();
+            }
+
+            // Add 'u' key shortcut to focus URL input (when not in text input)
+            if (e.target !== textInput && e.target !== urlInput && e.key === 'u') {
+                urlInput.focus();
+                e.preventDefault();
+            }
+        });
+
+        // Optional: Add URL validation and suggestions
+        function validateAndSuggestUrl(url) {
+            const urlInput = document.getElementById('urlInput');
+
+            // Auto-add https:// for simple domains
+            if (url && !url.includes('://') && !url.includes('@') && url.includes('.')) {
+                if (!url.match(/^[a-z]+:/)) {
+                    return 'https://' + url;
+                }
+            }
+
+            return url;
+        }
+
+        // Add input event listener for URL suggestions
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlInput = document.getElementById('urlInput');
+            if (urlInput) {
+                urlInput.addEventListener('blur', (e) => {
+                    const suggestedUrl = validateAndSuggestUrl(e.target.value);
+                    if (suggestedUrl !== e.target.value) {
+                        e.target.value = suggestedUrl;
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('DOM loaded, checking DeviceLogsManager...');
+            if (typeof DeviceLogsManager === 'undefined') {
+                console.error('❌ DeviceLogsManager not found - logs.js failed to load');
+
+                // Try to load it again
+                const script = document.createElement('script');
+                script.src = '/static/js/logs.js';
+                script.onload = function () {
+                    console.log('✅ logs.js loaded successfully on retry');
+                    if (typeof DeviceLogsManager !== 'undefined') {
+                        initLogViewer();
+                    }
+                };
+                script.onerror = function () {
+                    console.error('❌ Failed to load logs.js even on retry');
+                };
+                document.head.appendChild(script);
+            } else {
+                console.log('✅ DeviceLogsManager found successfully');
+            }
+        });
+
+        let appsListCollapsed = false;
+
+        function toggleAppsSection() {
+            const appsListSection = document.getElementById('appsListSection');
+            const toggleIcon = document.getElementById('appsToggleIcon');
+
+            appsListCollapsed = !appsListCollapsed;
+
+            if (appsListCollapsed) {
+                // Collapse
+                appsListSection.classList.add('collapsed');
+                toggleIcon.classList.add('collapsed');
+                toggleIcon.textContent = '▶';
+
+                // Update status
+                showTemporaryStatus('📱 Apps list collapsed');
+
+                // Store preference in localStorage
+                localStorage.setItem('appsListCollapsed', 'true');
+            } else {
+                // Expand
+                appsListSection.classList.remove('collapsed');
+                toggleIcon.classList.remove('collapsed');
+                toggleIcon.textContent = '▼';
+
+                // Update status
+                showTemporaryStatus('📱 Apps list expanded');
+
+                // Store preference in localStorage
+                localStorage.setItem('appsListCollapsed', 'false');
+
+                // Refresh apps when expanding
+                if (installedApps.length === 0) {
+                    loadInstalledApps();
+                }
+            }
+        }
+
+        // Load collapsed state from localStorage on page load
+        function loadAppsListState() {
+            const savedState = localStorage.getItem('appsListCollapsed');
+            if (savedState === 'true') {
+                // Delay to ensure elements are loaded
+                setTimeout(() => {
+                    toggleAppsSection();
+                }, 100);
+            }
+        }
+
+        // Update the init function to load the saved state
+        function init() {
+            setupControlWebSocket();
+            setupKeyboardShortcuts();
+            switchMode('video');
+            loadInstalledApps();
+            loadAppsListState(); // Add this line
+        }
+
+        // Optional: Add keyboard shortcut to toggle apps list
+        document.addEventListener('keydown', (e) => {
+            // Add to your existing keydown handler
+            if (e.target !== textInput && e.target !== document.getElementById('urlInput')) {
+                switch (e.key) {
+                    // ... your existing cases ...
+                    case 'a':
+                        e.preventDefault();
+                        toggleAppsSection();
+                        break;
+                }
+            }
+        });
+        window.testWebSocketConnection = testWebSocketConnection;
 
 
         // Handle window resize to maintain aspect ratio

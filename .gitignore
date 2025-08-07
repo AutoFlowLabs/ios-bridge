@@ -10,3 +10,6 @@ dist/
 *.apk
 *.log
 session_storage/
+IOS_TESTING_SCRIPTS/
+*.sh
+TestAppsForSimulator/

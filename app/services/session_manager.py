@@ -3,6 +3,8 @@ import os
 import time
 from typing import Dict, Optional, List
 from pathlib import Path
+from app.services.app_installation_service import NativeBridgeInstaller
+from app.services.ios_app_analyzer_service import AppInfo
 from app.services.ios_sim_manager_service import iOSSimulatorManager, SimulatorSession, SimulatorDevice, InstalledApp
 from app.core.logging import logger
 from app.config.settings import settings
@@ -426,16 +428,80 @@ class SessionManager:
         
         return len(invalid_sessions)
     
-    # Delegate app management methods (with persistent storage updates)
-    def install_ipa(self, session_id: str, ipa_path: str) -> bool:
-        success = self.ios_manager.install_ipa(session_id, ipa_path)
-        if success:
-            # Update our session copy from iOS manager
-            if session_id in self.ios_manager.active_sessions:
-                self.active_sessions[session_id] = self.ios_manager.active_sessions[session_id]
-            self._save_sessions()
-        return success
+    def _serialize_app_info(self, app_info: AppInfo) -> dict:
+        """Convert AppInfo object to serializable dict"""
+        if not app_info:
+            return None
+            
+        return {
+            'bundle_id': app_info.bundle_id,
+            'app_name': app_info.app_name,
+            'display_name': app_info.display_name,
+            'version': app_info.version,
+            'build_version': app_info.build_version,
+            'min_os_version': app_info.min_os_version,
+            'supported_platforms': app_info.supported_platforms,
+            'architectures': app_info.architecture_info.architectures if app_info.architecture_info else [],
+            'file_size_mb': round(app_info.file_size / (1024 * 1024), 2) if app_info.file_size else 0,
+            'has_info_plist': app_info.has_info_plist
+        }
     
+    def install_app(self, session_id: str, app_path: str, progress_callback=None) -> dict:
+        """
+        Install app using NativeBridgeInstaller with comprehensive handling
+        """
+        # Initialize the installer if not already done
+        if not hasattr(self, '_installer'):
+            self._installer = NativeBridgeInstaller(self.ios_manager.active_sessions)
+        
+        # Update installer's session reference (in case sessions changed)
+        self._installer.active_sessions = self.ios_manager.active_sessions
+        
+        try:
+            # Use NativeBridgeInstaller for comprehensive app installation
+            result = self._installer.install_user_app(session_id, app_path, progress_callback)
+            
+            # Create response dict - PRESERVE the compatibility and app_info
+            response = {
+                'success': result.success,
+                'message': result.message,
+                'compatibility': result.compatibility.value if result.compatibility else 'unknown',
+                'app_info': self._serialize_app_info(result.app_info) if result.app_info else None,
+                'suggestions': result.suggestions,
+                'alternatives': result.alternatives,
+                'processing_steps': result.processing_steps
+            }
+            
+            if result.success:
+                # Update our session copy from iOS manager
+                if session_id in self.ios_manager.active_sessions:
+                    self.active_sessions[session_id] = self.ios_manager.active_sessions[session_id]
+                self._save_sessions()
+                
+                # Add success details
+                response['installed_app'] = {
+                    'bundle_id': result.app_info.bundle_id if result.app_info else None,
+                    'app_name': result.app_info.display_name or result.app_info.app_name if result.app_info else None,
+                    'installed_at': time.time()
+                }
+
+            print(f"Installation result: {response}")        
+            return response
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f"Installation error: {str(e)}",
+                'compatibility': 'error',
+                'suggestions': [
+                    "Please try uploading the app again",
+                    "Ensure the app file is not corrupted",
+                    "Contact support if the issue persists"
+                ],
+                'error_details': str(e)
+            }
+        
+        
     def launch_app(self, session_id: str, bundle_id: str) -> bool:
         return self.ios_manager.launch_app(session_id, bundle_id)
     
@@ -472,6 +538,19 @@ class SessionManager:
         self._recover_orphaned_simulators()
         recovered_count = len(self.active_sessions) - initial_count
         return recovered_count
+    
+    def open_url(self, session_id: str, url: str) -> bool:
+        """Open a URL on the simulator"""
+        success = self.ios_manager.open_url(session_id, url)
+        if success:
+            logger.info(f"Successfully opened URL '{url}' on session {session_id}")
+        else:
+            logger.error(f"Failed to open URL '{url}' on session {session_id}")
+        return success
+
+    def get_url_scheme_info(self, session_id: str) -> Dict:
+        """Get URL scheme information for a session"""
+        return self.ios_manager.get_url_scheme_info(session_id)
 
 # Global session manager instance
 session_manager = SessionManager()

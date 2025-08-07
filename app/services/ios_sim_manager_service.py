@@ -217,137 +217,13 @@ class iOSSimulatorManager:
             return bundle_id, app_name
     
 
-    def _modify_app_for_simulator(self, app_bundle_path: str) -> bool:
-        """
-        Modify app bundle to make it compatible with iOS Simulator
-        This removes problematic entitlements and modifies Info.plist
-        """
-        try:
-            print("   🔧 Modifying app for simulator compatibility...")
-            
-            # Path to Info.plist
-            info_plist_path = os.path.join(app_bundle_path, 'Info.plist')
-            if not os.path.exists(info_plist_path):
-                print(f"   ❌ Info.plist not found in app bundle")
-                return False
-            
-            # Read and modify Info.plist
-            with open(info_plist_path, 'rb') as f:
-                plist_data = plistlib.load(f)
-            
-            # Remove problematic keys that can cause launch issues
-            problematic_keys = [
-                'UIDeviceFamily',  # Sometimes causes issues
-                'UISupportedInterfaceOrientations~ipad',  # iPad specific
-                'CFBundleURLTypes',  # URL schemes can cause issues
-                'NSAppTransportSecurity',  # Network security
-            ]
-            
-            # Modify UIDeviceFamily to support both iPhone and iPad
-            if 'UIDeviceFamily' in plist_data:
-                plist_data['UIDeviceFamily'] = [1, 2]  # iPhone and iPad
-            
-            # Ensure simulator-friendly settings
-            plist_data['LSRequiresIPhoneOS'] = True
-            
-            # Remove or modify problematic orientations
-            if 'UISupportedInterfaceOrientations' in plist_data:
-                # Ensure basic orientations are supported
-                orientations = plist_data['UISupportedInterfaceOrientations']
-                if isinstance(orientations, list) and len(orientations) == 0:
-                    plist_data['UISupportedInterfaceOrientations'] = [
-                        'UIInterfaceOrientationPortrait'
-                    ]
-            
-            # Write modified Info.plist
-            with open(info_plist_path, 'wb') as f:
-                plistlib.dump(plist_data, f)
-            
-            # Remove entitlements file if it exists
-            entitlements_path = os.path.join(app_bundle_path, 'Entitlements.plist')
-            if os.path.exists(entitlements_path):
-                os.remove(entitlements_path)
-                print("   🗑️  Removed Entitlements.plist")
-            
-            # Remove code signature (required for simulator)
-            self._remove_code_signature(app_bundle_path)
-            
-            return True
-            
-        except Exception as e:
-            print(f"   ❌ Error modifying app: {str(e)}")
-            return False
-    
-    def _remove_code_signature(self, app_bundle_path: str) -> bool:
-        """Remove code signature from app bundle"""
-        try:
-            code_signature_path = os.path.join(app_bundle_path, '_CodeSignature')
-            if os.path.exists(code_signature_path):
-                shutil.rmtree(code_signature_path)
-                print("   🗑️  Removed code signature")
-            
-            # Remove embedded mobileprovision
-            mobileprovision_files = [
-                'embedded.mobileprovision',
-                'Embedded.mobileprovision'
-            ]
-            
-            for mp_file in mobileprovision_files:
-                mp_path = os.path.join(app_bundle_path, mp_file)
-                if os.path.exists(mp_path):
-                    os.remove(mp_path)
-                    print(f"   🗑️  Removed {mp_file}")
-            
-            return True
-        except Exception as e:
-            print(f"   ❌ Error removing code signature: {str(e)}")
-            return False
-    
-    def _resign_for_simulator(self, app_bundle_path: str) -> bool:
-        """Re-sign app bundle for iOS Simulator (if codesign is available)"""
-        try:
-            # Check if codesign is available
-            result = subprocess.run(['which', 'codesign'], capture_output=True, text=True)
-            if result.returncode != 0:
-                print("   ⚠️  codesign not available, skipping re-signing")
-                return True
-            
-            print("   🔐 Re-signing app for simulator...")
-            
-            # Remove existing signature
-            command = ['codesign', '--remove-signature', app_bundle_path]
-            subprocess.run(command, capture_output=True, check=False)
-            
-            # Re-sign with ad-hoc signature
-            command = [
-                'codesign', 
-                '--force', 
-                '--sign', '-',  # Ad-hoc signature
-                '--preserve-metadata=entitlements',
-                '--deep',
-                app_bundle_path
-            ]
-            
-            result = subprocess.run(command, capture_output=True, text=True)
-            if result.returncode == 0:
-                print("   ✅ Successfully re-signed app")
-                return True
-            else:
-                print(f"   ⚠️  Re-signing failed (continuing anyway): {result.stderr}")
-                return True  # Continue even if re-signing fails
-                
-        except Exception as e:
-            print(f"   ⚠️  Re-signing error (continuing anyway): {str(e)}")
-            return True  # Continue even if re-signing fails
-    
-    def install_ipa(self, session_id: str, ipa_path: str, modify_for_simulator: bool = True) -> bool:
+    def install_ipa(self, session_id: str, ipa_path: str) -> bool:
         """
         Install an IPA file to a simulator session with enhanced compatibility
         
         Args:
             session_id: The session ID of the target simulator
             ipa_path: Path to the IPA file to install
-            modify_for_simulator: Whether to modify the app for simulator compatibility
             
         Returns:
             bool: Success status
@@ -382,13 +258,7 @@ class iOSSimulatorManager:
                     raise Exception("Invalid IPA file: No .app bundle found")
                 
                 app_bundle_path = os.path.join(payload_dir, app_dirs[0])
-                
-                # Modify app for simulator compatibility if requested
-                if modify_for_simulator:
-                    modification_success = self._modify_app_for_simulator(app_bundle_path)
-                    if modification_success:
-                        self._resign_for_simulator(app_bundle_path)
-                
+                                
                 # Try installing the modified .app bundle
                 print(f"   💾 Installing modified app bundle...")
                 command = ['xcrun', 'simctl', 'install', session.udid, app_bundle_path]
@@ -401,24 +271,15 @@ class iOSSimulatorManager:
                         app_name=app_name,
                         app_path=ipa_path,
                         installed_at=time.time(),
-                        app_type="modified" if modify_for_simulator else "user"
+                        app_type="user"
                     )
                     session.installed_apps[bundle_id] = installed_app
                     
                     print(f"✅ Successfully installed {app_name}")
                     print(f"   Bundle ID: {bundle_id}")
-                    print(f"   Type: {'Modified for simulator' if modify_for_simulator else 'Original'}")
                     return True
                 else:
-                    print(f"❌ Failed to install modified app: {output}")
-                    
-                    # Fallback: Try original IPA
-                    if modify_for_simulator:
-                        print("   🔄 Trying original IPA without modifications...")
-                        return self.install_ipa(session_id, ipa_path, modify_for_simulator=False)
-                    else:
-                        return False
-                        
+                    print(f"❌ Failed to install app: {output}")
         except Exception as e:
             print(f"❌ Error installing IPA: {str(e)}")
             return False
@@ -671,10 +532,6 @@ class iOSSimulatorManager:
             
         except Exception as e:
             return {"error": str(e)}
-
-
-
-
     
     def uninstall_app(self, session_id: str, bundle_id: str) -> bool:
         """
@@ -733,9 +590,6 @@ class iOSSimulatorManager:
         except Exception as e:
             print(f"❌ Error uninstalling app: {str(e)}")
             return False
-
-
-
      
     def terminate_app(self, session_id: str, bundle_id: str) -> bool:
         """Terminate a running app on the simulator"""
@@ -979,7 +833,6 @@ class iOSSimulatorManager:
         except Exception as e:
             return False, str(e)
     
-
     def _parse_plist_output(self, plist_str: str) -> dict:
         try:
             # Remove surrounding whitespace
@@ -1004,7 +857,6 @@ class iOSSimulatorManager:
         except Exception as e:
             print(f"❌ Failed to parse plist output: {e}")
             return {}
-
 
     def list_installed_apps(self, session_id: str) -> List[Dict]:
         """List all installed apps on a simulator using shell pipe to convert plist to JSON"""
@@ -1056,8 +908,7 @@ class iOSSimulatorManager:
         except Exception as e:
             print(f"❌ Error listing apps: {str(e)}")
             return []
-
-          
+     
     def get_app_container_path(self, session_id: str, bundle_id: str) -> Optional[str]:
         """Get the container path for a specific app"""
         if session_id not in self.active_sessions:
@@ -1138,6 +989,147 @@ class iOSSimulatorManager:
         except Exception as e:
             print(f"❌ Error adding videos: {str(e)}")
             return False
+
+    def open_url(self, session_id: str, url: str) -> bool:
+        """
+        Open a URL on the simulator (web URL or custom URL scheme)
+        
+        Args:
+            session_id: The session ID of the target simulator
+            url: The URL to open (e.g., 'https://facebook.com' or 'myapp://deep-link')
+            
+        Returns:
+            bool: Success status
+        """
+        if session_id not in self.active_sessions:
+            print(f"❌ Session {session_id} not found")
+            return False
+        
+        session = self.active_sessions[session_id]
+        
+        try:
+            print(f"🌐 Opening URL on simulator: {url}")
+            
+            # Validate URL format
+            if not url.strip():
+                print("❌ Empty URL provided")
+                return False
+            
+            # Add protocol if missing for web URLs
+            processed_url = url.strip()
+            if not processed_url.startswith(('http://', 'https://', 'ftp://', 'file://')) and '://' not in processed_url:
+                # Assume it's a web URL and add https://
+                processed_url = 'https://' + processed_url
+                print(f"🔗 Added https:// protocol: {processed_url}")
+            
+            # Use simctl openurl command
+            command = ['xcrun', 'simctl', 'openurl', session.udid, processed_url]
+            success, output = self._run_command(command)
+            
+            if success:
+                print(f"✅ Successfully opened URL: {processed_url}")
+                return True
+            else:
+                print(f"❌ Failed to open URL: {output}")
+                
+                # Try alternative approach for custom schemes
+                if '://' in url and not url.startswith(('http://', 'https://')):
+                    print(f"🔄 Trying alternative method for custom URL scheme...")
+                    return self._try_alternative_url_open(session, processed_url)
+                
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error opening URL: {str(e)}")
+            return False
+
+    def _try_alternative_url_open(self, session: SimulatorSession, url: str) -> bool:
+        """Try alternative methods to open URL"""
+        try:
+            # Method 1: Try with Safari if it's a web URL
+            if url.startswith(('http://', 'https://')):
+                print("   🌐 Trying to open with Safari...")
+                safari_command = ['xcrun', 'simctl', 'launch', session.udid, 'com.apple.mobilesafari', url]
+                success, output = self._run_command(safari_command)
+                if success:
+                    print("   ✅ Opened with Safari")
+                    return True
+            
+            # Method 2: Try URL encoding
+            print("   🔧 Trying with URL encoding...")
+            import urllib.parse
+            encoded_url = urllib.parse.quote(url, safe=':/?#[]@!$&\'()*+,;=')
+            command = ['xcrun', 'simctl', 'openurl', session.udid, encoded_url]
+            success, output = self._run_command(command)
+            if success:
+                print("   ✅ URL encoding method succeeded")
+                return True
+            
+            # Method 3: Try launching specific app for known schemes
+            scheme = url.split('://')[0] if '://' in url else None
+            if scheme:
+                print(f"   📱 Trying to find app for scheme: {scheme}")
+                # Common URL schemes to bundle ID mapping
+                scheme_to_bundle = {
+                    'mailto': 'com.apple.mobilemail',
+                    'tel': 'com.apple.mobilephone',
+                    'sms': 'com.apple.MobileSMS',
+                    'facetime': 'com.apple.facetime',
+                    'maps': 'com.apple.Maps',
+                    'music': 'com.apple.Music',
+                    'podcasts': 'com.apple.podcasts',
+                    'photos': 'com.apple.mobileslideshow'
+                }
+                
+                if scheme in scheme_to_bundle:
+                    bundle_id = scheme_to_bundle[scheme]
+                    launch_command = ['xcrun', 'simctl', 'launch', session.udid, bundle_id, url]
+                    success, output = self._run_command(launch_command)
+                    if success:
+                        print(f"   ✅ Launched {bundle_id} with URL")
+                        return True
+            
+            print("   ❌ All alternative methods failed")
+            return False
+            
+        except Exception as e:
+            print(f"   ❌ Alternative URL open methods failed: {str(e)}")
+            return False
+
+    def get_url_scheme_info(self, session_id: str) -> Dict:
+        """Get information about supported URL schemes on the simulator"""
+        if session_id not in self.active_sessions:
+            return {"error": "Session not found"}
+        
+        try:
+            # Get list of installed apps and their URL schemes
+            apps = self.list_installed_apps(session_id)
+            
+            # Common URL schemes
+            common_schemes = {
+                'Web URLs': ['http://', 'https://'],
+                'Communication': ['mailto:', 'tel:', 'sms:', 'facetime:'],
+                'Apple Apps': ['maps:', 'music:', 'podcasts:', 'photos:', 'shortcuts:'],
+                'System': ['settings:', 'prefs:', 'app-settings:'],
+                'Development': ['simulator:', 'xctest:']
+            }
+            
+            return {
+                "success": True,
+                "installed_apps": len(apps),
+                "common_schemes": common_schemes,
+                "examples": [
+                    "https://www.apple.com",
+                    "mailto:test@example.com",
+                    "tel:+1234567890",
+                    "sms:+1234567890",
+                    "maps:?q=Apple Park",
+                    "settings:root=General"
+                ]
+            }
+            
+        except Exception as e:
+            return {"error": str(e)}
 
     # [Previous methods remain the same: start_simulator, kill_simulator, etc.]
     def start_simulator(self, device_type: str, ios_version: str) -> str:
