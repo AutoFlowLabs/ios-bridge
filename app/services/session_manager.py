@@ -505,6 +505,29 @@ class SessionManager:
     def launch_app(self, session_id: str, bundle_id: str) -> bool:
         return self.ios_manager.launch_app(session_id, bundle_id)
     
+
+    def is_app_installed(self, session_id: str, bundle_id: str) -> bool:
+        """Check if an app is installed in a session"""
+        try:
+            apps = self.list_installed_apps(session_id)
+            if not apps:
+                return False
+                
+            for app in apps:
+                if isinstance(app, dict):
+                    app_bundle_id = app.get('bundle_id')
+                else:
+                    app_bundle_id = getattr(app, 'bundle_id', None)
+                
+                if app_bundle_id == bundle_id:
+                    return True
+                    
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking if app is installed: {e}")
+            return False
+    
     def uninstall_app(self, session_id: str, bundle_id: str) -> bool:
         success = self.ios_manager.uninstall_app(session_id, bundle_id)
         if success:

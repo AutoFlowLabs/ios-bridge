@@ -705,6 +705,64 @@ async def install_and_launch_app(
         logger.error(f"Error installing and launching app: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+# Replace the uninstall_app endpoint around line 600:
+
+@router.delete("/{session_id}/apps/{bundle_id}")
+async def uninstall_app(session_id: str, bundle_id: str):
+    """Uninstall an app from a session"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Check if app is installed first and get app name
+        app_name = None
+        if not session_manager.is_app_installed(session_id, bundle_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"App with bundle ID '{bundle_id}' not found"
+            )
+        
+        # Get app name before uninstalling
+        try:
+            apps = session_manager.list_installed_apps(session_id)
+            if apps:
+                for app in apps:
+                    if isinstance(app, dict):
+                        app_bundle_id = app.get('bundle_id')
+                        app_name = app.get('app_name', 'Unknown App')
+                    else:
+                        app_bundle_id = getattr(app, 'bundle_id', None)
+                        app_name = getattr(app, 'app_name', 'Unknown App')
+                    
+                    if app_bundle_id == bundle_id:
+                        break
+        except Exception as e:
+            logger.warning(f"Could not get app name for {bundle_id}: {e}")
+        
+        # Use SessionManager method (returns boolean)
+        success = session_manager.uninstall_app(session_id, bundle_id)
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"App '{app_name or bundle_id}' uninstalled successfully",
+                "bundle_id": bundle_id,
+                "app_name": app_name
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to uninstall app '{app_name or bundle_id}'"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uninstalling app: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/refresh")
 async def refresh_sessions():
     """Refresh session states and remove invalid ones"""
