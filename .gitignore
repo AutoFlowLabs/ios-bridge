@@ -13,3 +13,7 @@ session_storage/
 IOS_TESTING_SCRIPTS/
 *.sh
 TestAppsForSimulator/
+ios-bridge-cli/ios_bridge_cli/__pycache__/
+ios-bridge-cli/ios_bridge_cli/electron_app/node_modules/*
+ios-bridge-cli/ios_bridge_cli/electron_app/dist/*
+ios-bridge-cli/ios_bridge_cli/electron_app/build/*

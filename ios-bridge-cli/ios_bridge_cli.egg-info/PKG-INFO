@@ -1,0 +1,116 @@
+Metadata-Version: 2.4
+Name: ios-bridge-cli
+Version: 1.0.0
+Summary: Desktop streaming client for iOS Bridge simulator sessions
+Home-page: https://github.com/your-org/ios-bridge-cli
+Author: iOS Bridge Team
+Author-email: iOS Bridge Team <support@iosbridge.dev>
+License: MIT
+Project-URL: Homepage, https://github.com/your-org/ios-bridge-cli
+Project-URL: Bug Tracker, https://github.com/your-org/ios-bridge-cli/issues
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Operating System :: Microsoft :: Windows
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: click>=8.0.0
+Requires-Dist: requests>=2.25.0
+Requires-Dist: websockets>=10.0
+Requires-Dist: pillow>=8.0.0
+Requires-Dist: psutil>=5.8.0
+Requires-Dist: aiohttp>=3.8.0
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
+# iOS Bridge CLI
+
+A Python-based command-line tool for streaming and controlling iOS simulator sessions from your desktop, similar to how scrcpy works for Android devices.
+
+## Features
+
+- 🖥️ Desktop streaming of iOS simulator sessions
+- 🎮 Touch and keyboard input control
+- 📱 Device controls (Home, Screenshot, Device Info)
+- 🔌 WebSocket-based real-time streaming
+- 🚀 Easy installation via pip
+- 💻 Cross-platform Electron-based UI
+
+## Installation
+
+```bash
+pip install ios-bridge-cli
+```
+
+## Usage
+
+### Session Management
+```bash
+# List available device types and iOS versions
+ios-bridge devices --server http://localhost:8000
+
+# Create a new iOS simulator session
+ios-bridge create "iPhone 14 Pro" "16.0" --server http://localhost:8000
+
+# List active sessions
+ios-bridge list --server http://localhost:8000
+
+# Get session information
+ios-bridge info <session_id> --server http://localhost:8000
+
+# Terminate a session
+ios-bridge terminate <session_id> --server http://localhost:8000
+```
+
+### Streaming and Control
+```bash
+# Stream an existing session in desktop window
+ios-bridge stream <session_id> --server http://localhost:8000
+
+# Stream with quality settings
+ios-bridge stream <session_id> --quality ultra --fullscreen
+
+# Take screenshot
+ios-bridge screenshot <session_id> --output screenshot.png
+```
+
+## Controls
+
+- **Mouse**: Click and drag for touch input
+- **Keyboard**: Type directly into the device
+- **Ctrl+C**: Close streaming window and exit
+- **F1**: Home button
+- **F2**: Take screenshot
+- **F3**: Show device info
+
+## Requirements
+
+- macOS (for iOS Bridge server)
+- Python 3.8+
+- Running iOS Bridge server instance
+
+## Architecture
+
+```
+┌─────────────────┐    HTTP/WS     ┌─────────────────┐    IPC    ┌─────────────────┐
+│   Python CLI    │ ←─────────────→ │  iOS Bridge     │           │  Electron App   │
+│                 │                 │    Server       │           │                 │
+│ • CLI parsing   │                 │                 │           │ • Video render  │
+│ • API client    │                 │ • Session mgmt  │ ←────────→ │ • Touch input   │
+│ • Process mgmt  │                 │ • WebSockets    │           │ • UI controls   │
+└─────────────────┘                 └─────────────────┘           └─────────────────┘
+```
+
+## License
+
+MIT License

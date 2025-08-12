@@ -1,0 +1,388 @@
+/* iOS Bridge Desktop Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #1a1a1a;
+    color: #ffffff;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Header */
+.header {
+    background: #2d2d2d;
+    border-bottom: 1px solid #404040;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    z-index: 100;
+    -webkit-app-region: drag;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.device-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+#device-name {
+    font-weight: 500;
+}
+
+#connection-status {
+    font-size: 12px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-connecting { color: #ffa500; }
+.status-connected { color: #00ff00; }
+.status-error { color: #ff4444; }
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+}
+
+.control-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.control-btn:hover {
+    background: #404040;
+}
+
+.control-btn.close:hover {
+    background: #ff4444;
+}
+
+.separator {
+    width: 1px;
+    height: 20px;
+    background: #404040;
+    margin: 0 4px;
+}
+
+/* Dropdown */
+.dropdown-btn .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #2d2d2d;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    padding: 4px 0;
+    min-width: 100px;
+    display: none;
+    z-index: 1000;
+}
+
+.dropdown-btn.active .dropdown-menu {
+    display: block;
+}
+
+.dropdown-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.dropdown-item:hover {
+    background: #404040;
+}
+
+.dropdown-item.active {
+    background: #0066cc;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: hidden;
+}
+
+.loading {
+    text-align: center;
+    color: #888;
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #404040;
+    border-top: 3px solid #0066cc;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.device-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.device-frame {
+    position: relative;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.video-canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    cursor: pointer;
+}
+
+.touch-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* Error Container */
+.error-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.error-content {
+    text-align: center;
+    max-width: 400px;
+    padding: 32px;
+}
+
+.error-content svg {
+    margin-bottom: 16px;
+}
+
+.error-content h3 {
+    margin-bottom: 8px;
+    color: #ff4444;
+}
+
+.error-content p {
+    margin-bottom: 24px;
+    color: #888;
+    line-height: 1.5;
+}
+
+.retry-btn {
+    background: #0066cc;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+    background: #0056b3;
+}
+
+/* Footer */
+.footer {
+    background: #2d2d2d;
+    border-top: 1px solid #404040;
+    padding: 8px 16px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    color: #888;
+}
+
+.footer-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+}
+
+.spacer {
+    flex: 1;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: #2d2d2d;
+    border-radius: 8px;
+    min-width: 400px;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    border: 1px solid #404040;
+}
+
+.modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #404040;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    color: #fff;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.info-table th,
+.info-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #404040;
+}
+
+.info-table th {
+    color: #888;
+    font-weight: 500;
+    width: 30%;
+}
+
+.info-table td {
+    color: #fff;
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+}
+
+/* Touch feedback */
+.touch-point {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border: 2px solid #0066cc;
+    border-radius: 50%;
+    background: rgba(0, 102, 204, 0.2);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: touch-feedback 0.3s ease-out;
+}
+
+@keyframes touch-feedback {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0;
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header-controls {
+        gap: 4px;
+    }
+    
+    .control-btn {
+        padding: 4px;
+    }
+    
+    .device-info {
+        font-size: 13px;
+    }
+}

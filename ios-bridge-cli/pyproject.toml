@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ios-bridge-cli"
+version = "1.0.0"
+description = "Desktop streaming client for iOS Bridge simulator sessions"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "iOS Bridge Team", email = "support@iosbridge.dev"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "click>=8.0.0",
+    "requests>=2.25.0",
+    "websockets>=10.0",
+    "pillow>=8.0.0",
+    "psutil>=5.8.0",
+    "aiohttp>=3.8.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/your-org/ios-bridge-cli"
+"Bug Tracker" = "https://github.com/your-org/ios-bridge-cli/issues"
+
+[project.scripts]
+ios-bridge = "ios_bridge_cli.cli:main"
+
+[tool.setuptools]
+packages = ["ios_bridge_cli"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"ios_bridge_cli" = [
+    "electron_app/**/*",
+    "electron_app/src/**/*",
+]

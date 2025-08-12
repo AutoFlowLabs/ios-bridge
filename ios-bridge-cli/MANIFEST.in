@@ -1,0 +1,7 @@
+include README.md
+include LICENSE
+recursive-include ios_bridge_cli/electron_app *.json *.js *.html *.css
+recursive-include ios_bridge_cli/electron_app/src *
+recursive-include ios_bridge_cli/electron_app/assets *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

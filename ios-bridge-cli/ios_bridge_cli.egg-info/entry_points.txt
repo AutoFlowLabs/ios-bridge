@@ -1,0 +1,2 @@
+[console_scripts]
+ios-bridge = ios_bridge_cli.cli:main

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS Bridge Desktop</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header with controls -->
+        <header class="header">
+            <div class="header-left">
+                <div class="device-info">
+                    <span id="device-name">Loading...</span>
+                    <span id="connection-status" class="status-connecting">●</span>
+                </div>
+            </div>
+            
+            <div class="header-controls">
+                <button id="home-btn" class="control-btn" title="Home (F1)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                    </svg>
+                </button>
+                
+                <button id="screenshot-btn" class="control-btn" title="Screenshot (F2)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14.25 2.1l-.9-.9L9.8 4.7 5.1 0l-.9.9L8.7 5.6 0 14.25l.9.9L9.8 6.7l4.7 4.7.9-.9L10.9 6l8.6-8.6z"/>
+                        <circle cx="9" cy="9" r="2"/>
+                        <path d="M21 15H3v6h18v-6zM7 18H5v-1h2v1z"/>
+                    </svg>
+                </button>
+                
+                <button id="info-btn" class="control-btn" title="Device Info (F3)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                    </svg>
+                </button>
+                
+                <div class="separator"></div>
+                
+                <button id="quality-btn" class="control-btn dropdown-btn" title="Quality Settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+                    </svg>
+                    <div class="dropdown-menu" id="quality-menu">
+                        <div class="dropdown-item" data-quality="low">Low</div>
+                        <div class="dropdown-item" data-quality="medium">Medium</div>
+                        <div class="dropdown-item active" data-quality="high">High</div>
+                        <div class="dropdown-item" data-quality="ultra">Ultra</div>
+                    </div>
+                </button>
+                
+                <button id="minimize-btn" class="control-btn" title="Minimize">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19h12v2H6z"/>
+                    </svg>
+                </button>
+                
+                <button id="close-btn" class="control-btn close" title="Close (Ctrl+C)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Main content area -->
+        <main class="main-content">
+            <div id="loading" class="loading">
+                <div class="loading-spinner"></div>
+                <p>Connecting to iOS Bridge...</p>
+            </div>
+            
+            <div id="device-container" class="device-container" style="display: none;">
+                <div class="device-frame">
+                    <canvas id="video-canvas" class="video-canvas"></canvas>
+                    <div id="touch-overlay" class="touch-overlay"></div>
+                </div>
+            </div>
+            
+            <div id="error-container" class="error-container" style="display: none;">
+                <div class="error-content">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="#ff4444">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                    <h3>Connection Error</h3>
+                    <p id="error-message">Unable to connect to iOS Bridge server</p>
+                    <button id="retry-btn" class="retry-btn">Retry Connection</button>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Footer with status -->
+        <footer class="footer">
+            <div class="footer-content">
+                <span id="fps-counter">FPS: 0</span>
+                <span id="latency">Latency: 0ms</span>
+                <span id="resolution">Resolution: 0x0</span>
+                <span class="spacer"></span>
+                <span id="keyboard-hint">💡 Click to focus, type to input text</span>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Device info modal -->
+    <div id="info-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Device Information</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="info-modal-body">
+                <!-- Device info will be populated here -->
+            </div>
+        </div>
+    </div>
+    
+    <script src="renderer.js"></script>
+</body>
+</html>
