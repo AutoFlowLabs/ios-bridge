@@ -1495,3 +1495,266 @@ async def get_predefined_locations(session_id: str):
     except Exception as e:
         logger.error(f"Error getting predefined locations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{session_id}/media/photos/add")
+async def add_photos(
+    session_id: str,
+    photos: List[UploadFile] = File(...)
+):
+    """Add photos to simulator's photo library"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if not photos:
+            raise HTTPException(status_code=400, detail="No photos provided")
+        
+        # Save uploaded photos temporarily
+        temp_paths = []
+        try:
+            for photo in photos:
+                if not photo.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif')):
+                    raise HTTPException(status_code=400, detail=f"Invalid photo format: {photo.filename}")
+                
+                # Create temp file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(photo.filename)[1]) as temp_file:
+                    content = await photo.read()
+                    temp_file.write(content)
+                    temp_paths.append(temp_file.name)
+            
+            # Add photos using session manager
+            success = session_manager.ios_manager.add_photos(session_id, *temp_paths)
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": f"Successfully added {len(photos)} photo(s)",
+                    "count": len(photos),
+                    "photos": [photo.filename for photo in photos]
+                }
+            else:
+                raise HTTPException(status_code=500, detail="Failed to add photos to simulator")
+                
+        finally:
+            # Clean up temp files
+            for temp_path in temp_paths:
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding photos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{session_id}/media/videos/add")
+async def add_videos(
+    session_id: str,
+    videos: List[UploadFile] = File(...)
+):
+    """Add videos to simulator's photo library"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if not videos:
+            raise HTTPException(status_code=400, detail="No videos provided")
+        
+        # Save uploaded videos temporarily
+        temp_paths = []
+        try:
+            for video in videos:
+                if not video.filename.lower().endswith(('.mp4', '.mov', '.m4v', '.avi', '.mkv')):
+                    raise HTTPException(status_code=400, detail=f"Invalid video format: {video.filename}")
+                
+                # Create temp file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(video.filename)[1]) as temp_file:
+                    content = await video.read()
+                    temp_file.write(content)
+                    temp_paths.append(temp_file.name)
+            
+            # Add videos using session manager
+            success = session_manager.ios_manager.add_videos(session_id, *temp_paths)
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": f"Successfully added {len(videos)} video(s)",
+                    "count": len(videos),
+                    "videos": [video.filename for video in videos]
+                }
+            else:
+                raise HTTPException(status_code=500, detail="Failed to add videos to simulator")
+                
+        finally:
+            # Clean up temp files
+            for temp_path in temp_paths:
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding videos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{session_id}/files/push")
+async def push_file(
+    session_id: str,
+    file: UploadFile = File(...),
+    device_path: str = Form(...),
+    bundle_id: Optional[str] = Form(None)
+):
+    """Push a file to the simulator"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No file provided")
+        
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{file.filename}") as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        try:
+            # Push file using session manager
+            success = session_manager.ios_manager.push_file(session_id, temp_path, device_path, bundle_id)
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": f"Successfully pushed file: {file.filename}",
+                    "filename": file.filename,
+                    "device_path": device_path,
+                    "bundle_id": bundle_id,
+                    "size": len(content)
+                }
+            else:
+                raise HTTPException(status_code=500, detail="Failed to push file to simulator")
+                
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error pushing file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{session_id}/files/pull")
+async def pull_file(
+    session_id: str,
+    device_path: str = Form(...),
+    bundle_id: Optional[str] = Form(None),
+    filename: Optional[str] = Form(None)
+):
+    """Pull a file from the simulator"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Generate filename if not provided
+        if not filename:
+            filename = os.path.basename(device_path) or "pulled_file"
+        
+        # Create temp file for pulling
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{filename}") as temp_file:
+            temp_path = temp_file.name
+        
+        try:
+            # Pull file using session manager
+            success = session_manager.ios_manager.pull_file(session_id, device_path, temp_path, bundle_id)
+            
+            if success and os.path.exists(temp_path):
+                # Return file as download
+                return FileResponse(
+                    path=temp_path,
+                    filename=filename,
+                    media_type='application/octet-stream'
+                )
+            else:
+                # Clean up temp file if pull failed
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                raise HTTPException(status_code=404, detail="File not found on simulator or pull failed")
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            # Clean up temp file on error
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+            raise e
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error pulling file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{session_id}/files/app-container")
+async def get_app_container_path(session_id: str, bundle_id: str):
+    """Get app container path"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        container_path = session_manager.ios_manager.get_app_container_path(session_id, bundle_id)
+        
+        if container_path:
+            return {
+                "success": True,
+                "container_path": container_path,
+                "bundle_id": bundle_id
+            }
+        else:
+            raise HTTPException(status_code=404, detail="App container not found")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting app container: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{session_id}/media/info")
+async def get_media_info(session_id: str):
+    """Get information about supported media formats"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        return {
+            "success": True,
+            "supported_photo_formats": [".jpg", ".jpeg", ".png", ".gif", ".heic", ".heif"],
+            "supported_video_formats": [".mp4", ".mov", ".m4v", ".avi", ".mkv"],
+            "max_file_size": "100MB",
+            "common_paths": {
+                "app_documents": "/Documents/",
+                "app_library": "/Library/",
+                "app_tmp": "/tmp/",
+                "simulator_tmp": "/tmp/",
+                "simulator_documents": "/Documents/"
+            }
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting media info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

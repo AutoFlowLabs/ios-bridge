@@ -1104,11 +1104,156 @@
                 transition: all 0.2s ease;
             }
 
+            .media-drop-zone {
+                border: 2px dashed #ddd;
+                border-radius: 8px;
+                padding: 40px;
+                text-align: center;
+                margin-bottom: 20px;
+                transition: all 0.3s ease;
+                cursor: pointer;
+            }
+
+            .media-drop-zone.drag-highlight {
+                border-color: #007bff;
+                background-color: #f0f8ff;
+            }
+
+            .drop-zone-content {
+                pointer-events: none;
+            }
+
+            .drop-zone-icon {
+                font-size: 48px;
+                margin-bottom: 10px;
+            }
+
+            .drop-zone-text strong {
+                font-size: 16px;
+                color: #333;
+            }
+
+            .drop-zone-text small {
+                color: #666;
+                font-size: 12px;
+            }
+
+            .media-group {
+                margin-bottom: 20px;
+                padding: 15px;
+                border: 1px solid #eee;
+                border-radius: 6px;
+                background: #fafafa;
+            }
+
+            .media-group h4 {
+                margin: 0 0 10px 0;
+                font-size: 14px;
+                color: #333;
+            }
+
+            .media-btn {
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                margin: 2px;
+                transition: background 0.2s;
+            }
+
+            .media-btn:hover {
+                background: #0056b3;
+            }
+
+            .photo-btn {
+                background: #28a745;
+            }
+
+            .photo-btn:hover {
+                background: #1e7e34;
+            }
+
+            .video-btn {
+                background: #dc3545;
+            }
+
+            .video-btn:hover {
+                background: #c82333;
+            }
+
+            .push-btn {
+                background: #ffc107;
+                color: #000;
+            }
+
+            .push-btn:hover {
+                background: #e0a800;
+            }
+
+            .pull-btn {
+                background: #17a2b8;
+            }
+
+            .pull-btn:hover {
+                background: #138496;
+            }
+
+            .file-transfer-controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+                align-items: center;
+                margin-bottom: 5px;
+            }
+
+            .path-input,
+            .bundle-input,
+            .filename-input {
+                flex: 1;
+                min-width: 200px;
+                padding: 6px 10px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+
+            .quick-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+
+            .quick-btn {
+                background: #6c757d;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                transition: background 0.2s;
+            }
+
+            .quick-btn:hover {
+                background: #5a6268;
+            }
+
+            .media-group small {
+                color: #666;
+                font-size: 11px;
+                display: block;
+                margin-top: 5px;
+            }
+
 
         }
     </style>
     <script src="/static/js/logs.js" onerror="console.error('Failed to load logs.js')"></script>
     <script src="/static/js/location.js" onerror="console.error('Failed to load location.js')"></script>
+    <script src="/static/js/media_transfer.js" onerror="console.error('Failed to load media_transfer.js')"></script>
 
 </head>
 
@@ -1224,6 +1369,95 @@
                     <div class="app-count" id="appCount">Loading apps...</div>
                     <div class="app-list" id="appList">
                         <div class="no-apps">Loading installed apps...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-header">
+                    <h3>📱 Media & File Transfer</h3>
+                    <button onclick="toggleSection('mediaTransferSection')" class="toggle-btn">▼</button>
+                </div>
+                <div id="mediaTransferSection" class="section-content">
+
+                    <!-- Drop Zone -->
+                    <div id="mediaDropZone" class="media-drop-zone">
+                        <div class="drop-zone-content">
+                            <div class="drop-zone-icon">📁</div>
+                            <div class="drop-zone-text">
+                                <strong>Drop files here</strong><br>
+                                <small>Photos, videos, or any files</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Photo Upload -->
+                    <div class="media-group">
+                        <h4>📷 Photos</h4>
+                        <div class="input-group">
+                            <input type="file" id="photoUpload" accept="image/*" multiple style="display: none;">
+                            <button onclick="document.getElementById('photoUpload').click()"
+                                class="media-btn photo-btn">
+                                📷 Select Photos
+                            </button>
+                            <small>Supported: JPG, PNG, HEIC, GIF</small>
+                        </div>
+                    </div>
+
+                    <!-- Video Upload -->
+                    <div class="media-group">
+                        <h4>🎥 Videos</h4>
+                        <div class="input-group">
+                            <input type="file" id="videoUpload" accept="video/*" multiple style="display: none;">
+                            <button onclick="document.getElementById('videoUpload').click()"
+                                class="media-btn video-btn">
+                                🎥 Select Videos
+                            </button>
+                            <small>Supported: MP4, MOV, M4V</small>
+                        </div>
+                    </div>
+
+                    <!-- File Push -->
+                    <div class="media-group">
+                        <h4>📤 Push File to Simulator</h4>
+                        <div class="file-transfer-controls">
+                            <input type="file" id="pushFileInput" style="display: none;">
+                            <button onclick="document.getElementById('pushFileInput').click()" class="media-btn">
+                                📁 Select File
+                            </button>
+                            <input type="text" id="devicePathInput"
+                                placeholder="Device path (e.g., /Documents/myfile.txt)" class="path-input">
+                            <input type="text" id="bundleIdInput" placeholder="Bundle ID (optional)"
+                                class="bundle-input">
+                            <button id="pushFileBtn" class="media-btn push-btn">📤 Push File</button>
+                        </div>
+                        <small>Push any file to simulator filesystem or app container</small>
+                    </div>
+
+                    <!-- File Pull -->
+                    <div class="media-group">
+                        <h4>📥 Pull File from Simulator</h4>
+                        <div class="file-transfer-controls">
+                            <input type="text" id="pullDevicePathInput"
+                                placeholder="Device path (e.g., /Documents/myfile.txt)" class="path-input">
+                            <input type="text" id="pullBundleIdInput" placeholder="Bundle ID (optional)"
+                                class="bundle-input">
+                            <input type="text" id="pullFilenameInput" placeholder="Save as filename (optional)"
+                                class="filename-input">
+                            <button id="pullFileBtn" class="media-btn pull-btn">📥 Pull File</button>
+                        </div>
+                        <small>Pull any file from simulator to download</small>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="media-group">
+                        <h4>⚡ Quick Actions</h4>
+                        <div class="quick-actions">
+                            <button onclick="fillCommonPath('/Documents/')" class="quick-btn">📄 Documents</button>
+                            <button onclick="fillCommonPath('/Library/')" class="quick-btn">📚 Library</button>
+                            <button onclick="fillCommonPath('/tmp/')" class="quick-btn">🗂️ Temp</button>
+                            <button onclick="getAppContainer()" class="quick-btn">📱 App Container</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3179,21 +3413,26 @@
             switchMode('video');
             loadInstalledApps();
             loadAppsListState(); // Add this line
+
+            setTimeout(() => {
+                console.log('Starting subsystem initialization...');
+
+                // Initialize logs
+                if (typeof initLogViewer === 'function') {
+                    initLogViewer();
+                }
+
+                // Initialize location controls
+                if (typeof initLocationControls === 'function') {
+                    initLocationControls();
+                }
+
+                // Initialize media transfer
+                initMediaTransfer();
+
+            }, 1500);
         }
 
-        // Optional: Add keyboard shortcut to toggle apps list
-        document.addEventListener('keydown', (e) => {
-            // Add to your existing keydown handler
-            if (e.target !== textInput && e.target !== document.getElementById('urlInput')) {
-                switch (e.key) {
-                    // ... your existing cases ...
-                    case 'a':
-                        e.preventDefault();
-                        toggleAppsSection();
-                        break;
-                }
-            }
-        });
         window.testWebSocketConnection = testWebSocketConnection;
 
 
@@ -3239,6 +3478,39 @@
                 }, 100);
             }
         });
+
+
+        async function getAppContainer() {
+            const bundleId = prompt('Enter app bundle ID:');
+            if (!bundleId) return;
+
+            if (window.mediaTransferManager) {
+                const containerPath = await window.mediaTransferManager.getAppContainerPath(bundleId);
+                if (containerPath) {
+                    showTemporaryStatus(`📱 App container: ${containerPath}`);
+                    // Fill in the inputs
+                    const pushBundleInput = document.getElementById('bundleIdInput');
+                    const pullBundleInput = document.getElementById('pullBundleIdInput');
+
+                    if (pushBundleInput) pushBundleInput.value = bundleId;
+                    if (pullBundleInput) pullBundleInput.value = bundleId;
+                }
+            }
+        }
+
+        // Initialize media transfer manager
+        function initMediaTransfer() {
+            if (window.mediaTransferManager && !window.mediaTransferManager.initialized) {
+                window.mediaTransferManager.init();
+                window.mediaTransferManager.initialized = true;
+                console.log('Media transfer manager initialized');
+            }
+        }
+
+        // Call this in your main init function
+        setTimeout(() => {
+            initMediaTransfer();
+        }, 1000);
     </script>
 </body>
 
