@@ -245,7 +245,7 @@ class IOSBridgeRenderer {
             eventTarget.removeEventListener('mousemove', this.handleTouchMove);
             eventTarget.removeEventListener('mouseup', this.handleTouchEnd);
             
-            // Add new listeners
+            // Add new listeners (used for WebSocket/canvas mode)
             eventTarget.addEventListener('mousedown', this.handleTouchStart.bind(this));
             eventTarget.addEventListener('mousemove', this.handleTouchMove.bind(this));
             eventTarget.addEventListener('mouseup', this.handleTouchEnd.bind(this));
@@ -279,17 +279,19 @@ class IOSBridgeRenderer {
             
             if (this.streamMode === 'webrtc') {
                 console.log('🚀 Setting up WebRTC mode...');
-                // Show WebRTC video, hide canvas
+                // Show WebRTC video, hide canvas, and ensure overlay doesn't intercept events
                 this.canvas.style.display = 'none';
                 this.webrtcVideo.style.display = 'block';
-                console.log('👀 Canvas hidden, WebRTC video shown');
+                if (this.touchOverlay) this.touchOverlay.style.pointerEvents = 'none';
+                console.log('👀 Canvas hidden, WebRTC video shown, overlay disabled for pointer events');
                 await this.connectWebRTC(wsUrls.webrtc);
             } else {
                 console.log('📡 Setting up WebSocket mode...');
-                // Show canvas, hide WebRTC video
+                // Show canvas, hide WebRTC video, and enable overlay events
                 this.canvas.style.display = 'block';
                 this.webrtcVideo.style.display = 'none';
-                console.log('👀 WebRTC video hidden, canvas shown');
+                if (this.touchOverlay) this.touchOverlay.style.pointerEvents = 'auto';
+                console.log('👀 WebRTC video hidden, canvas shown, overlay enabled for pointer events');
                 // Connect to video WebSocket
                 await this.connectWebSocket('video', wsUrls.video);
             }
@@ -383,6 +385,58 @@ class IOSBridgeRenderer {
         }
     }
     
+    setupWebRTCEventListeners() {
+        if (!this.webrtcVideo) return;
+        
+        // Remove existing listeners first to avoid duplicates
+        this.webrtcVideo.removeEventListener('mousedown', this.handleWebRTCTouchStart);
+        this.webrtcVideo.removeEventListener('mousemove', this.handleWebRTCTouchMove);
+        this.webrtcVideo.removeEventListener('mouseup', this.handleWebRTCTouchEnd);
+        // Also remove potential previous resize listener
+        this.webrtcVideo.removeEventListener('resize', this.handleWebRTCVideoResize);
+        
+        // Add new listeners
+        this.webrtcVideo.addEventListener('mousedown', this.handleWebRTCTouchStart.bind(this));
+        this.webrtcVideo.addEventListener('mousemove', this.handleWebRTCTouchMove.bind(this));
+        this.webrtcVideo.addEventListener('mouseup', this.handleWebRTCTouchEnd.bind(this));
+        
+        // Listen for intrinsic video size changes (e.g., rotation)
+        this.handleWebRTCVideoResize = async () => {
+            try {
+                console.log(`🎞️ WebRTC video resized: intrinsic ${this.webrtcVideo.videoWidth}x${this.webrtcVideo.videoHeight}`);
+                await this.updateWebRTCVideoLayoutFromElement();
+            } catch (e) {
+                console.warn('Error handling WebRTC video resize:', e);
+            }
+        };
+        this.webrtcVideo.addEventListener('resize', this.handleWebRTCVideoResize);
+        
+        this.webrtcVideo.style.cursor = 'crosshair';
+    }
+    
+    async updateWebRTCVideoLayoutFromElement() {
+        if (!this.webrtcVideo) return;
+        // Update stream dimensions from actual video element
+        this.streamDimensions = {
+            width: this.webrtcVideo.videoWidth || this.streamDimensions.width,
+            height: this.webrtcVideo.videoHeight || this.streamDimensions.height
+        };
+        console.log(`📺 Updating layout for WebRTC video. Stream: ${this.streamDimensions.width}x${this.streamDimensions.height}`);
+        // Ask main to resize window to match stream pixel size; set CSS to scaled content size
+        try {
+            const res = await window.electronAPI.resizeWindow(this.streamDimensions.width, this.streamDimensions.height);
+            if (res && !res.error) {
+                this.applyScaledCssSize(res.contentWidth, res.contentHeight);
+                this.updateOrientationClass();
+                this.updateResolutionDisplay(this.streamDimensions.width, this.streamDimensions.height);
+            }
+        } catch (err) {
+            console.error('resizeWindow error (WebRTC):', err);
+        }
+        // Refresh logical device dimensions from backend to ensure mapping correctness
+        await this.refreshDeviceDimensions();
+    }
+    
     async connectWebRTC(webrtcUrl) {
         return new Promise((resolve, reject) => {
             console.log('🚀 Initializing WebRTC connection...');
@@ -401,16 +455,18 @@ class IOSBridgeRenderer {
                     this.canvas.style.display = 'none';
                     
                     // Debug video dimensions when stream starts
-                    this.webrtcVideo.addEventListener('loadedmetadata', () => {
+                    this.webrtcVideo.addEventListener('loadedmetadata', async () => {
                         console.log(`📺 WebRTC Video Stream Started:`);
                         console.log(`   Video Resolution: ${this.webrtcVideo.videoWidth}x${this.webrtcVideo.videoHeight}`);
                         console.log(`   CSS Display Size: ${this.webrtcVideo.clientWidth}x${this.webrtcVideo.clientHeight}`);
                         console.log(`   Offset Size: ${this.webrtcVideo.offsetWidth}x${this.webrtcVideo.offsetHeight}`);
                         console.log(`   Canvas Display Size: ${this.canvas.clientWidth}x${this.canvas.clientHeight}`);
                         console.log(`   Device Dimensions: ${this.deviceDimensions.width}x${this.deviceDimensions.height}`);
-                    });
+
+                        await this.updateWebRTCVideoLayoutFromElement();
+                    }, { once: true });
                     
-                    // Setup video element event listeners
+                    // Setup video element event listeners (including resize)
                     this.setupWebRTCEventListeners();
                 }
             };
@@ -509,22 +565,6 @@ class IOSBridgeRenderer {
         });
     }
     
-    setupWebRTCEventListeners() {
-        if (!this.webrtcVideo) return;
-        
-        // Remove existing listeners first to avoid duplicates
-        this.webrtcVideo.removeEventListener('mousedown', this.handleWebRTCTouchStart);
-        this.webrtcVideo.removeEventListener('mousemove', this.handleWebRTCTouchMove);
-        this.webrtcVideo.removeEventListener('mouseup', this.handleWebRTCTouchEnd);
-        
-        // Add new listeners
-        this.webrtcVideo.addEventListener('mousedown', this.handleWebRTCTouchStart.bind(this));
-        this.webrtcVideo.addEventListener('mousemove', this.handleWebRTCTouchMove.bind(this));
-        this.webrtcVideo.addEventListener('mouseup', this.handleWebRTCTouchEnd.bind(this));
-        
-        this.webrtcVideo.style.cursor = 'crosshair';
-    }
-    
     handleWebRTCTouchStart(event) {
         const rect = this.webrtcVideo.getBoundingClientRect();
         const x = event.clientX - rect.left;
@@ -584,12 +624,12 @@ class IOSBridgeRenderer {
             return;
         }
         
-        // Send swipe command via control WebSocket
+        // Send swipe command via control WebSocket (use camelCase keys expected by sender)
         this.sendDeviceAction('swipe', {
-            start_x: startCoords.x,
-            start_y: startCoords.y,
-            end_x: endCoords.x,
-            end_y: endCoords.y
+            startX: startCoords.x,
+            startY: startCoords.y,
+            endX: endCoords.x,
+            endY: endCoords.y
         });
     }
     
@@ -598,18 +638,56 @@ class IOSBridgeRenderer {
             return null;
         }
         
-        // Get the actual displayed size of the video element (CSS size)
-        const displayWidth = this.webrtcVideo.clientWidth || this.webrtcVideo.offsetWidth;
-        const displayHeight = this.webrtcVideo.clientHeight || this.webrtcVideo.offsetHeight;
+        // Get element display size
+        const elemW = this.webrtcVideo.clientWidth || this.webrtcVideo.offsetWidth;
+        const elemH = this.webrtcVideo.clientHeight || this.webrtcVideo.offsetHeight;
+        const vidW = this.webrtcVideo.videoWidth || this.streamDimensions.width;
+        const vidH = this.webrtcVideo.videoHeight || this.streamDimensions.height;
         
-        // Use the SAME logic as canvas coordinate conversion for consistency
-        // Convert display coordinates directly to device coordinates based on logical dimensions
-        const deviceX = Math.round((displayX / displayWidth) * this.deviceDimensions.width);
-        const deviceY = Math.round((displayY / displayHeight) * this.deviceDimensions.height);
+        if (!elemW || !elemH || !vidW || !vidH) return null;
         
-        // Debug: console.log(`WebRTC: Display(${displayX}, ${displayY}) -> Device(${deviceX}, ${deviceY})`);
+        // Account for object-fit: contain letterboxing by computing actual rendered content box
+        const scale = Math.min(elemW / vidW, elemH / vidH);
+        const contentW = vidW * scale;
+        const contentH = vidH * scale;
+        const offsetX = (elemW - contentW) / 2;
+        const offsetY = (elemH - contentH) / 2;
+        
+        // Map display coords (relative to element) into content coords
+        const inContentX = displayX - offsetX;
+        const inContentY = displayY - offsetY;
+        
+        // Normalize to [0,1]
+        const nx = Math.max(0, Math.min(1, inContentX / contentW));
+        const ny = Math.max(0, Math.min(1, inContentY / contentH));
+        
+        // Convert to logical device coordinates
+        const deviceX = Math.round(nx * this.deviceDimensions.width);
+        const deviceY = Math.round(ny * this.deviceDimensions.height);
+        
+        // Debug
+        console.log(`🎯 WebRTC map -> elem ${elemW}x${elemH}, video ${vidW}x${vidH}, content ${Math.round(contentW)}x${Math.round(contentH)}, offset ${Math.round(offsetX)},${Math.round(offsetY)}, display ${Math.round(displayX)},${Math.round(displayY)} => device ${deviceX},${deviceY} (points ${this.deviceDimensions.width}x${this.deviceDimensions.height})`);
         
         return { x: deviceX, y: deviceY };
+    }
+    
+    async refreshDeviceDimensions() {
+        try {
+            const sessionId = this.config?.sessionId;
+            const serverUrl = this.config?.serverUrl;
+            if (!sessionId || !serverUrl) return;
+            const resp = await fetch(`${serverUrl}/api/sessions/${sessionId}`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const dw = parseInt(data?.device_width, 10);
+            const dh = parseInt(data?.device_height, 10);
+            if (dw > 0 && dh > 0) {
+                this.deviceDimensions = { width: dw, height: dh };
+                console.log(`🔧 Refreshed device logical dimensions from server: ${dw}x${dh}`);
+            }
+        } catch (e) {
+            console.warn('Failed to refresh device dimensions:', e);
+        }
     }
     
     toggleStreamMode() {

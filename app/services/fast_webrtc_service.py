@@ -80,6 +80,9 @@ class FastWebRTCService:
         # Fast streaming settings
         self.target_fps = 60
         self.quality_preset = "medium"
+        # Keep last source and encoded sizes for debug/rotation detection
+        self._last_src_size = None  # (w, h)
+        self._last_enc_size = None  # (w, h)
         
         logger.info(f"🚀 FastWebRTCService initialized for {udid}")
     
@@ -158,18 +161,31 @@ class FastWebRTCService:
                             if img.mode != 'RGB':
                                 img = img.convert('RGB')
                             
-                            # Optimize resolution for speed vs quality
-                            if self.quality_preset == "ultra":
-                                target_size = (468, 1014)  # 2x logical
-                            elif self.quality_preset == "high":
-                                target_size = (390, 844)   # 1.67x logical
-                            elif self.quality_preset == "medium":
-                                target_size = (312, 675)   # 1.33x logical
-                            else:  # low
-                                target_size = (234, 507)   # 1x logical
+                            src_w, src_h = img.width, img.height
+                            if self._last_src_size != (src_w, src_h):
+                                logger.info(f"🖼️ Source screenshot size: {src_w}x{src_h}")
+                                self._last_src_size = (src_w, src_h)
                             
-                            # Fast resize
-                            img = img.resize(target_size, Image.Resampling.BILINEAR)  # Faster than LANCZOS
+                            # Determine scale factor per preset (relative to source), preserve aspect ratio
+                            # Chosen to balance quality vs latency; avoid upscaling
+                            scale_map = {
+                                'low': 0.25,
+                                'medium': 0.33,
+                                'high': 0.40,
+                                'ultra': 0.45,
+                            }
+                            scale = max(0.1, min(1.0, scale_map.get(self.quality_preset, 0.33)))
+                            
+                            target_w = max(2, int(src_w * scale))
+                            target_h = max(2, int(src_h * scale))
+                            
+                            # Fast resize with reasonable quality
+                            if target_w != src_w or target_h != src_h:
+                                img = img.resize((target_w, target_h), Image.Resampling.BILINEAR)
+                            
+                            if self._last_enc_size != (img.width, img.height):
+                                logger.info(f"🎯 Encoded frame size: {img.width}x{img.height} (preset={self.quality_preset}, scale={scale:.2f})")
+                                self._last_enc_size = (img.width, img.height)
                             
                             # Convert to frame
                             img_array = np.array(img, dtype=np.uint8)
@@ -198,7 +214,7 @@ class FastWebRTCService:
                     # Periodic status
                     if current_time - last_log_time >= 15.0:
                         actual_fps = frame_count / (current_time - last_log_time) if (current_time - last_log_time) > 0 else 0
-                        logger.info(f"📊 Fast WebRTC {self.udid}: {frame_count} frames, {actual_fps:.1f}fps, queue: {self.frame_queue.qsize()}")
+                        logger.info(f"📊 Fast WebRTC {self.udid}: {frame_count} frames, {actual_fps:.1f}fps, queue: {self.frame_queue.qsize()}, enc: {self._last_enc_size}")
                         last_log_time = current_time
                         frame_count = 0
                 
