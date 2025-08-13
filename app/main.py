@@ -1,5 +1,6 @@
 import signal
 import atexit
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +20,8 @@ from app.api.websockets.video_ws import VideoWebSocket
 from app.api.websockets.screenshot_ws import ScreenshotWebSocket
 from app.api.websockets.webrtc_ws import WebRTCWebSocket
 from app.services.fast_webrtc_service import FastWebRTCService
+from app.services.connection_manager import connection_manager, managed_connection
+from app.services.resource_manager import resource_manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,6 +31,11 @@ async def lifespan(app: FastAPI):
         # Trigger orphaned simulator recovery on startup
         logger.info("Performing orphaned simulator recovery...")
         session_manager._recover_orphaned_simulators()
+        
+        # Start background tasks for connection and resource management
+        connection_manager.start_background_tasks()
+        resource_manager.start_background_tasks()
+        
         logger.info("Startup complete")
     except Exception as e:
         logger.error(f"Error during startup: {e}")
@@ -36,6 +44,11 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Application shutting down...")
+    
+    # Stop background tasks
+    await connection_manager.stop_background_tasks()
+    await resource_manager.cleanup_all_services()
+    
     cleanup()
 
 app = FastAPI(title="iOS Remote Control", version="1.0.0", lifespan=lifespan)
@@ -68,7 +81,7 @@ async def control_websocket(websocket: WebSocket, session_id: str):
 
 @app.websocket("/ws/{session_id}/video")
 async def video_websocket(websocket: WebSocket, session_id: str):
-    """Video WebSocket endpoint"""
+    """Video WebSocket endpoint with connection management"""
     try:
         # Validate session exists first
         udid = session_manager.get_session_udid(session_id)
@@ -77,30 +90,32 @@ async def video_websocket(websocket: WebSocket, session_id: str):
             await websocket.close(code=4004, reason="Session not found")
             return
         
-        # Create services for this session
-        video_service = VideoService(udid)
-        device_service = DeviceService(udid)
+        await websocket.accept()
         
-        # Start video capture for this session
-        if not video_service.start_video_capture():
-            logger.error(f"Failed to start video capture for session {session_id}")
-            await websocket.accept()
-            await websocket.close(code=4003, reason="Failed to start video capture")
-            return
-        
-        video_ws = VideoWebSocket(video_service, device_service)
-        
-        # Handle the connection
-        await video_ws.handle_connection(websocket)
-        
+        # Use managed connection with rate limiting and tracking
+        client_ip = getattr(websocket.client, 'host', None) if websocket.client else None
+        async with managed_connection(session_id, "video_websocket", websocket, client_ip):
+            # Get managed video service from resource manager
+            video_service = await resource_manager.get_video_service(udid, f"video_ws_{session_id}")
+            device_service = DeviceService(udid)
+            
+            video_ws = VideoWebSocket(video_service, device_service)
+            
+            # Handle the connection
+            await video_ws.handle_connection_managed(websocket)
+            
     except WebSocketDisconnect:
         logger.info(f"Video WebSocket disconnected for session: {session_id}")
     except Exception as e:
         logger.error(f"Video WebSocket error for session {session_id}: {e}")
+    finally:
+        # Release video service when client disconnects
+        if 'udid' in locals():
+            await resource_manager.release_video_service(udid, f"video_ws_{session_id}")
 
 @app.websocket("/ws/{session_id}/webrtc")
 async def webrtc_websocket(websocket: WebSocket, session_id: str):
-    """WebRTC WebSocket endpoint - Real-time streaming using idb video-stream"""
+    """WebRTC WebSocket endpoint with connection management"""
     try:
         # Validate session exists first
         udid = session_manager.get_session_udid(session_id)
@@ -109,17 +124,26 @@ async def webrtc_websocket(websocket: WebSocket, session_id: str):
             await websocket.close(code=4004, reason="Session not found")
             return
         
-        # Create fast WebRTC service for this session
-        webrtc_service = FastWebRTCService(udid)
-        webrtc_ws = WebRTCWebSocket(webrtc_service)
+        await websocket.accept()
         
-        # Handle the connection
-        await webrtc_ws.handle_connection(websocket)
-        
+        # Use managed connection with rate limiting and tracking
+        client_ip = getattr(websocket.client, 'host', None) if websocket.client else None
+        async with managed_connection(session_id, "webrtc_websocket", websocket, client_ip):
+            # Get managed WebRTC service from resource manager
+            webrtc_service = await resource_manager.get_webrtc_service(udid, f"webrtc_ws_{session_id}")
+            webrtc_ws = WebRTCWebSocket(webrtc_service)
+            
+            # Handle the connection
+            await webrtc_ws.handle_connection(websocket)
+            
     except WebSocketDisconnect:
         logger.info(f"WebRTC WebSocket disconnected for session: {session_id}")
     except Exception as e:
         logger.error(f"WebRTC WebSocket error for session {session_id}: {e}")
+    finally:
+        # Release WebRTC service when client disconnects
+        if 'udid' in locals():
+            await resource_manager.release_webrtc_service(udid, f"webrtc_ws_{session_id}")
 
 @app.websocket("/ws/{session_id}/screenshot")
 async def screenshot_websocket(websocket: WebSocket, session_id: str):
@@ -144,6 +168,7 @@ async def screenshot_websocket(websocket: WebSocket, session_id: str):
         logger.info(f"Screenshot WebSocket disconnected for session: {session_id}")
     except Exception as e:
         logger.error(f"Screenshot WebSocket error for session {session_id}: {e}")
+
 
 
 @app.websocket("/ws/{session_id}/logs")
@@ -247,12 +272,35 @@ async def get_legacy_status():
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with resource manager stats"""
+    connection_stats = connection_manager.get_connection_stats()
+    resource_stats = resource_manager.get_service_stats()
+    
     return {
         "status": "healthy",
         "service": "iOS Remote Control",
-        "total_sessions": len(session_manager.list_sessions())
+        "total_sessions": len(session_manager.list_sessions()),
+        "connections": connection_stats,
+        "resources": resource_stats
     }
+
+# Connection and resource management stats endpoint
+@app.get("/stats")
+async def get_management_stats():
+    """Get detailed connection and resource management statistics"""
+    try:
+        connection_stats = connection_manager.get_connection_stats()
+        resource_stats = resource_manager.get_service_stats()
+        
+        return {
+            "success": True,
+            "timestamp": time.time(),
+            "connection_manager": connection_stats,
+            "resource_manager": resource_stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting management stats: {e}")
+        return {"success": False, "error": str(e)}
 
 # Cleanup
 def cleanup():
@@ -264,6 +312,15 @@ def cleanup():
         logger.info("All recordings cleaned up successfully")
     except Exception as e:
         logger.error(f"Error during recording cleanup: {e}")
+    
+    try:
+        # Log final stats before shutdown
+        connection_stats = connection_manager.get_connection_stats()
+        resource_stats = resource_manager.get_service_stats()
+        logger.info(f"Final connection stats: {connection_stats}")
+        logger.info(f"Final resource stats: {resource_stats}")
+    except Exception as e:
+        logger.error(f"Error getting final stats: {e}")
     # try:
     #     session_manager.delete_all_sessions()
     #     logger.info("All sessions cleaned up successfully")
@@ -271,7 +328,7 @@ def cleanup():
     #     logger.error(f"Error during cleanup: {e}")
 
 atexit.register(cleanup)
-signal.signal(signal.SIGTERM, lambda sig, frame: cleanup())
+signal.signal(signal.SIGTERM, lambda _sig, _frame: cleanup())
 
 if __name__ == "__main__":
     import uvicorn

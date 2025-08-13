@@ -12,6 +12,16 @@ class Settings:
     VIDEO_QUEUE_SIZE: int = 3
     WEBRTC_QUEUE_SIZE: int = 2
     
+    # Connection Management
+    MAX_CONNECTIONS_PER_SESSION: int = 10
+    MAX_CONNECTIONS_PER_MINUTE: int = 20
+    CONNECTION_CLEANUP_INTERVAL: int = 30
+    
+    # Resource Management
+    MAX_MEMORY_MB: int = 2048
+    SERVICE_IDLE_TIMEOUT: int = 300  # 5 minutes
+    MEMORY_CHECK_INTERVAL: int = 30
+    
     # Quality Settings
     DEFAULT_JPEG_QUALITY: int = 80
     WEBRTC_HIGH_QUALITY: int = 95
