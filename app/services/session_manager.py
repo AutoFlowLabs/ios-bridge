@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 from pathlib import Path
 from app.services.app_installation_service import NativeBridgeInstaller
 from app.services.ios_app_analyzer_service import AppInfo
@@ -387,6 +387,24 @@ class SessionManager:
             return None
         
         session = self.active_sessions[session_id]
+        
+        # Get device dimensions (logical points, scaled for desktop UI)
+        device_width, device_height = 390, 844  # Default dimensions
+        stream_width, stream_height = None, None  # Actual pixel dimensions of the stream
+        try:
+            from app.services.device_service import DeviceService
+            device_service = DeviceService(session.udid)
+            # Use synchronous version to avoid asyncio issues (returns scaled point dims)
+            device_width, device_height = self._get_device_dimensions_sync(device_service.udid)
+            # Also fetch the raw pixel stream dimensions for accurate rendering in Electron
+            stream_dims = self._get_stream_dimensions_sync(device_service.udid)
+            if stream_dims:
+                stream_width, stream_height = stream_dims
+        except Exception as e:
+            logger.warning(f"Could not get device dimensions for {session_id}: {e}")
+            # Fall back to defaults
+            pass
+        
         return {
             'session_id': session_id,
             'device_type': session.device_type,
@@ -397,6 +415,12 @@ class SessionManager:
             'uptime': time.time() - session.created_at,
             'pid': session.pid,
             'state': session.device.state,
+            # Desktop-scaled logical dimensions (used for coordinate mapping/UI)
+            'device_width': device_width,
+            'device_height': device_height,
+            # Raw stream pixel dimensions for accurate window sizing
+            'stream_width': stream_width,
+            'stream_height': stream_height,
             'installed_apps': {
                 bid: {
                     'name': app.app_name, 
@@ -406,6 +430,82 @@ class SessionManager:
                 for bid, app in session.installed_apps.items()
             }
         }
+    
+    def _get_device_dimensions_sync(self, udid: str) -> Tuple[int, int]:
+        """Get device dimensions synchronously - scaled for desktop display (logical points)."""
+        try:
+            import subprocess
+            import re
+            
+            cmd = ["idb", "describe", "--udid", udid]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            
+            if result.returncode == 0:
+                # Parse the screen_dimensions from the output
+                # Format: screen_dimensions=ScreenDimensions(width=1179, height=2556, density=3.0, width_points=393, height_points=852)
+                screen_dims_match = re.search(r'screen_dimensions=ScreenDimensions\([^)]+width_points=(\d+)[^)]+height_points=(\d+)', result.stdout)
+                
+                if screen_dims_match:
+                    width_points = int(screen_dims_match.group(1))
+                    height_points = int(screen_dims_match.group(2))
+                    
+                    # Scale down for desktop display (typically 0.6-0.8x looks good)
+                    desktop_scale = 0.75  # Adjust this value as needed
+                    desktop_width = int(width_points * desktop_scale)
+                    desktop_height = int(height_points * desktop_scale)
+                    
+                    logger.info(f"Device {udid} point dimensions: {width_points}x{height_points}, desktop scaled: {desktop_width}x{desktop_height}")
+                    return (desktop_width, desktop_height)
+                
+                # Fallback: try original regex patterns
+                width_points_match = re.search(r'width_points=(\d+)', result.stdout)
+                height_points_match = re.search(r'height_points=(\d+)', result.stdout)
+                
+                if width_points_match and height_points_match:
+                    width_points = int(width_points_match.group(1))
+                    height_points = int(height_points_match.group(1))
+                    
+                    # Scale down for desktop display
+                    desktop_scale = 0.75
+                    desktop_width = int(width_points * desktop_scale)
+                    desktop_height = int(height_points * desktop_scale)
+                    
+                    logger.info(f"Device {udid} fallback dimensions: {width_points}x{height_points}, desktop scaled: {desktop_width}x{desktop_height}")
+                    return (desktop_width, desktop_height)
+                
+        except Exception as e:
+            logger.warning(f"Error getting device dimensions: {e}")
+        
+        # Default dimensions for iPhone (scaled for desktop)
+        return (294, 633)  # 390*0.75, 844*0.75
+
+    def _get_stream_dimensions_sync(self, udid: str) -> Optional[Tuple[int, int]]:
+        """Get the raw stream pixel dimensions (width, height) via idb describe."""
+        try:
+            import subprocess
+            import re
+            cmd = ["idb", "describe", "--udid", udid]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            if result.returncode == 0:
+                # Look for width and height in pixels within ScreenDimensions
+                # Example: ScreenDimensions(width=1179, height=2556, density=3.0, width_points=393, height_points=852)
+                px_match = re.search(r'screen_dimensions=ScreenDimensions\([^)]*width=(\d+),\s*height=(\d+)', result.stdout)
+                if px_match:
+                    width_px = int(px_match.group(1))
+                    height_px = int(px_match.group(2))
+                    logger.info(f"Stream pixel dimensions for {udid}: {width_px}x{height_px}")
+                    return (width_px, height_px)
+                # Fallback: try separate matches
+                width_px_match = re.search(r'width=(\d+)', result.stdout)
+                height_px_match = re.search(r'height=(\d+)', result.stdout)
+                if width_px_match and height_px_match:
+                    width_px = int(width_px_match.group(1))
+                    height_px = int(height_px_match.group(1))
+                    logger.info(f"Stream pixel dimensions (fallback) for {udid}: {width_px}x{height_px}")
+                    return (width_px, height_px)
+        except Exception as e:
+            logger.warning(f"Error getting stream dimensions: {e}")
+        return None
     
     def refresh_session_states(self) -> int:
         """Refresh the state of all sessions and remove invalid ones"""

@@ -89,25 +89,111 @@ class IOSBridgeApp {
                 this.mainWindow.setAlwaysOnTop(alwaysOnTop);
             }
         });
+        
+        ipcMain.handle('resize-window', (event, width, height) => {
+            if (this.mainWindow) {
+                // Validate inputs - ensure they are valid numbers
+                if (typeof width !== 'number' || typeof height !== 'number' || 
+                    isNaN(width) || isNaN(height) || 
+                    width <= 0 || height <= 0) {
+                    console.error(`Invalid dimensions received: width=${width}, height=${height}`);
+                    return { error: 'invalid_dimensions' }; // Don't attempt to resize with invalid values
+                }
+                
+                // Get available screen dimensions
+                const currentDisplay = screen.getDisplayNearestPoint({
+                    x: this.mainWindow.getBounds().x, 
+                    y: this.mainWindow.getBounds().y
+                });
+                const { width: workWidth, height: workHeight } = currentDisplay.workAreaSize;
+                
+                // Visual shell padding (from styles.css .device-shell padding: 10px on each side)
+                const shellPadding = 20; // total (left+right or top+bottom)
+                const headerHeight = 48;
+                const footerHeight = 32;
+                
+                // Compute scale factor to fit both width and height within work area
+                const maxScaleCap = 1.0; // don't upscale beyond 100%
+                const availableWidth = Math.max(200, workWidth - 40); // leave margin
+                const availableHeight = Math.max(200, workHeight - (headerHeight + footerHeight) - 60);
+                const scaleByWidth = availableWidth / (width + shellPadding);
+                const scaleByHeight = availableHeight / (height + shellPadding);
+                const scaleFactor = Math.max(0.1, Math.min(maxScaleCap, scaleByWidth, scaleByHeight));
+                
+                // Apply the scale
+                const scaledContentWidth = Math.round(width * scaleFactor);
+                const scaledContentHeight = Math.round(height * scaleFactor);
+                
+                // Total window size includes header/footer and shell padding
+                const windowWidth = scaledContentWidth + shellPadding; // add horizontal shell padding
+                const windowHeight = scaledContentHeight + shellPadding + headerHeight + footerHeight;
+                
+                console.log(`Resizing window: Original ${width}x${height}, Scaled content ${scaledContentWidth}x${scaledContentHeight} (scale: ${scaleFactor.toFixed(2)}), Window ${windowWidth}x${windowHeight}`);
+                
+                // Update min size constraints to allow shrinking when orientation or stream size changes
+                try {
+                    this.mainWindow.setMinimumSize(windowWidth, windowHeight);
+                } catch (e) {
+                    console.warn('Failed to update minimum window size:', e?.message || e);
+                }
+
+                this.mainWindow.setSize(windowWidth, windowHeight);
+                this.mainWindow.center(); // Center the window after resizing
+                
+                return {
+                    contentWidth: scaledContentWidth,
+                    contentHeight: scaledContentHeight,
+                    scaleFactor
+                };
+            }
+            return { error: 'no_window' };
+        });
     }
     
     createWindow() {
         const primaryDisplay = screen.getPrimaryDisplay();
-        const { width, height } = primaryDisplay.workAreaSize;
+        const { width: workWidth, height: workHeight } = primaryDisplay.workAreaSize;
         
-        // Calculate window size based on device dimensions
-        const deviceWidth = 390;  // iPhone default width
-        const deviceHeight = 844; // iPhone default height
-        const scale = Math.min(width * 0.6 / deviceWidth, height * 0.8 / deviceHeight);
+        // Get dimensions from config session info
+        const sessionInfo = this.config?.sessionInfo || {};
+        // Prefer actual stream pixel dimensions for sizing
+        let baseWidth = sessionInfo.stream_width || sessionInfo.device_width || 390;
+        let baseHeight = sessionInfo.stream_height || sessionInfo.device_height || 844;
         
-        const windowWidth = Math.floor(deviceWidth * scale) + 100; // Extra space for controls
-        const windowHeight = Math.floor(deviceHeight * scale) + 150; // Extra space for title bar and controls
+        // Validate dimensions - ensure they're reasonable (allow smaller desktop-scaled dimensions)
+        if (baseWidth < 200 || baseWidth > 4000) baseWidth = sessionInfo.device_width || 390;
+        if (baseHeight < 400 || baseHeight > 8000) baseHeight = sessionInfo.device_height || 844;
+        
+        // Visual shell padding and chrome sizes
+        const headerHeight = 48;  // Header height from CSS
+        const footerHeight = 32;  // Footer height from CSS
+        const shellPadding = 20;  // 10px on all sides in styles.css
+        
+        // Apply scaling factor to fit within monitor size (consider both width and height)
+        const maxScaleCap = 1.0; // allow up to 100% of base size but no upscaling
+        const availableWidth = Math.max(200, workWidth - 40); // leave some margin
+        const availableHeight = Math.max(200, workHeight - (headerHeight + footerHeight) - 60);
+        const scaleByWidth = availableWidth / (baseWidth + shellPadding);
+        const scaleByHeight = availableHeight / (baseHeight + shellPadding);
+        const scaleFactor = Math.max(0.1, Math.min(maxScaleCap, scaleByWidth, scaleByHeight));
+        
+        // Apply the scale factor
+        const scaledContentWidth = Math.round(baseWidth * scaleFactor);
+        const scaledContentHeight = Math.round(baseHeight * scaleFactor);
+        
+        console.log(`Original stream/base dimensions: ${baseWidth}x${baseHeight}, Scaled content: ${scaledContentWidth}x${scaledContentHeight} (scale: ${scaleFactor.toFixed(2)})`);
+        
+        // Calculate exact window size to match device display area + chrome
+        const windowWidth = scaledContentWidth + shellPadding; // add horizontal shell padding
+        const windowHeight = scaledContentHeight + shellPadding + headerHeight + footerHeight;
+        
+        console.log(`Creating window content size: ${scaledContentWidth}x${scaledContentHeight}, window size: ${windowWidth}x${windowHeight}`);
         
         this.mainWindow = new BrowserWindow({
             width: windowWidth,
             height: windowHeight,
-            minWidth: 400,
-            minHeight: 600,
+            // Removed fixed min sizes so programmatic resizes (e.g., on rotation) can shrink window
+            resizable: false, // prevent user from resizing beyond device frame
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
@@ -117,7 +203,8 @@ class IOSBridgeApp {
             title: `iOS Bridge - ${this.config?.sessionInfo?.device_type || 'iOS Simulator'}`,
             titleBarStyle: 'default',
             show: false,
-            alwaysOnTop: this.config?.alwaysOnTop || false
+            alwaysOnTop: this.config?.alwaysOnTop || false,
+            backgroundColor: '#1a1a1a'
         });
         
         // Create menu
@@ -143,10 +230,56 @@ class IOSBridgeApp {
             }
         });
         
-        // Development tools
-        if (process.argv.includes('--dev')) {
-            this.mainWindow.webContents.openDevTools();
-        }
+        // Development tools - always enable for debugging
+        this.mainWindow.webContents.openDevTools();
+        
+        // Forward console messages to main process
+        console.log('='.repeat(60));
+        console.log('MAIN PROCESS: Setting up console message forwarding');
+        console.log('='.repeat(60));
+        
+        this.mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+            const levelMap = { 0: 'LOG', 1: 'WARN', 2: 'ERROR' };
+            const levelName = levelMap[level] || 'LOG';
+            console.log(`[RENDERER-${levelName}] ${message}`);
+        });
+        
+        // Also capture console API calls directly
+        this.mainWindow.webContents.executeJavaScript(`
+            const originalLog = console.log;
+            const originalWarn = console.warn;
+            const originalError = console.error;
+            
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+            };
+            console.warn = function(...args) {
+                originalWarn.apply(console, args);
+            };
+            console.error = function(...args) {
+                originalError.apply(console, args);
+            };
+        `);
+        
+        // Add keyboard shortcuts
+        this.mainWindow.webContents.on('before-input-event', (event, input) => {
+            // Toggle dev tools: Ctrl+Shift+I (Windows/Linux) or Cmd+Option+I (Mac)
+            if ((input.control && input.shift && input.key.toLowerCase() === 'i') ||
+                (input.meta && input.alt && input.key.toLowerCase() === 'i')) {
+                this.mainWindow.webContents.toggleDevTools();
+            }
+            
+            // Force dev tools open: F12
+            if (input.key === 'F12') {
+                this.mainWindow.webContents.openDevTools();
+            }
+            
+            // Copy in dev tools: Ctrl+C or Cmd+C
+            if ((input.control || input.meta) && input.key.toLowerCase() === 'c') {
+                // Let the dev tools handle copy
+                return;
+            }
+        });
     }
     
     createMenu() {

@@ -18,13 +18,13 @@
             </div>
             
             <div class="header-controls">
-                <button id="home-btn" class="control-btn" title="Home (F1)">
+                <button id="home-btn" class="control-btn" data-action="home" title="Home (F1)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
                     </svg>
                 </button>
                 
-                <button id="screenshot-btn" class="control-btn" title="Screenshot (F2)">
+                <button id="screenshot-btn" class="control-btn" data-action="screenshot" title="Screenshot (F2)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M14.25 2.1l-.9-.9L9.8 4.7 5.1 0l-.9.9L8.7 5.6 0 14.25l.9.9L9.8 6.7l4.7 4.7.9-.9L10.9 6l8.6-8.6z"/>
                         <circle cx="9" cy="9" r="2"/>
@@ -32,7 +32,7 @@
                     </svg>
                 </button>
                 
-                <button id="info-btn" class="control-btn" title="Device Info (F3)">
+                <button id="info-btn" class="control-btn" data-action="info" title="Device Info (F3)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
                     </svg>
@@ -74,9 +74,12 @@
             </div>
             
             <div id="device-container" class="device-container" style="display: none;">
-                <div class="device-frame">
-                    <canvas id="video-canvas" class="video-canvas"></canvas>
-                    <div id="touch-overlay" class="touch-overlay"></div>
+                <div class="device-shell">
+                    <div class="device-screen">
+                        <canvas id="video-canvas" class="video-canvas"></canvas>
+                        <div id="touch-overlay" class="touch-overlay"></div>
+                    </div>
+                    <div class="device-notch" aria-hidden="true"></div>
                 </div>
             </div>
             

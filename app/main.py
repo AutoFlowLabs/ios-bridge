@@ -80,6 +80,14 @@ async def video_websocket(websocket: WebSocket, session_id: str):
         # Create services for this session
         video_service = VideoService(udid)
         device_service = DeviceService(udid)
+        
+        # Start video capture for this session
+        if not video_service.start_video_capture():
+            logger.error(f"Failed to start video capture for session {session_id}")
+            await websocket.accept()
+            await websocket.close(code=4003, reason="Failed to start video capture")
+            return
+        
         video_ws = VideoWebSocket(video_service, device_service)
         
         # Handle the connection

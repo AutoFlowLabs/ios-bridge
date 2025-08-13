@@ -36,13 +36,38 @@ class ElectronAppManager:
         return str(electron_app_path)
     
     def _ensure_app_exists(self):
-        """Ensure the Electron app exists, build if necessary"""
-        dist_path = Path(self.app_path) / "dist"
+        """Ensure the Electron app exists, install dependencies if necessary"""
+        app_source_path = Path(self.app_path)
         
-        if not dist_path.exists():
+        # Check if we have package.json and node_modules
+        if not (app_source_path / "package.json").exists():
             if self.verbose:
-                print("📦 Electron app not found, building...")
-            self._build_app()
+                print("📦 Electron app template not found, creating...")
+            self._create_app_template()
+        
+        if not (app_source_path / "node_modules").exists():
+            if self.verbose:
+                print("📦 Installing Electron dependencies...")
+            self._install_dependencies()
+    
+    def _install_dependencies(self):
+        """Install npm dependencies"""
+        try:
+            app_source_path = Path(self.app_path)
+            env = os.environ.copy()
+            
+            subprocess.run(
+                ["npm", "install"],
+                cwd=app_source_path,
+                check=True,
+                env=env,
+                capture_output=not self.verbose
+            )
+            
+        except subprocess.CalledProcessError as e:
+            raise ElectronAppError(f"Failed to install dependencies: {e}")
+        except FileNotFoundError:
+            raise ElectronAppError("npm not found. Please install Node.js and npm")
     
     def _build_app(self):
         """Build the Electron app"""
@@ -131,33 +156,19 @@ class ElectronAppManager:
                 json.dump(config, f, indent=2)
                 self.config_file = f.name
             
-            # Determine the executable path
-            dist_path = Path(self.app_path) / "dist"
-            
-            # Platform-specific executable paths
-            if sys.platform == "darwin":
-                executable = dist_path / "iOS Bridge.app" / "Contents" / "MacOS" / "iOS Bridge"
-            elif sys.platform == "win32":
-                executable = dist_path / "iOS Bridge.exe"
-            else:  # Linux
-                executable = dist_path / "ios-bridge"
-            
-            if not executable.exists():
-                # Fallback to running with electron directly
-                executable = "electron"
-                args = [str(executable), str(self.app_path), "--config", self.config_file]
-            else:
-                args = [str(executable), "--config", self.config_file]
+            # Always run in development mode to ensure source changes take effect
+            executable = "electron"
+            args = [str(executable), str(self.app_path), "--config", self.config_file]
             
             if self.verbose:
                 print(f"🚀 Starting Electron app: {' '.join(args)}")
             
-            # Start the process
+            # Start the process - always show output for debugging
             self.process = subprocess.Popen(
                 args,
                 cwd=self.app_path,
-                stdout=subprocess.PIPE if not self.verbose else None,
-                stderr=subprocess.PIPE if not self.verbose else None
+                stdout=None,  # Always show stdout
+                stderr=None   # Always show stderr
             )
             
             # Wait for the process to complete
