@@ -654,6 +654,16 @@ class SessionManager:
                     logger.info(f"Removed old backup: {old_backup.name}")
         except Exception as e:
             logger.error(f"Failed to cleanup storage: {e}")
+    
+    def cleanup_all_recordings(self):
+        """Clean up all active recordings on app shutdown"""
+        try:
+            for session_id, session in self.active_sessions.items():
+                if hasattr(session, 'recording_service') and session.recording_service:
+                    logger.info(f"Stopping recording for session {session_id}")
+                    session.recording_service.force_stop()
+        except Exception as e:
+            logger.error(f"Failed to cleanup recordings: {e}")
 
     def recover_orphaned_simulators(self) -> int:
         """Manually trigger orphaned simulator recovery and return count of recovered sessions"""

@@ -8,6 +8,7 @@ from typing import List, Optional
 import tempfile
 import os
 from app.services.session_manager import session_manager
+from app.services.recording_service import RecordingService
 from app.models.responses import *
 from app.core.logging import logger
 
@@ -1757,4 +1758,133 @@ async def get_media_info(session_id: str):
         raise
     except Exception as e:
         logger.error(f"Error getting media info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{session_id}/recording/start")
+async def start_recording(session_id: str):
+    """Start video recording for a session"""
+    logger.info(f"🎬 Recording start request for session: {session_id}")
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = session_manager.get_session(session_id)
+        udid = session.udid
+        
+        # Create recording service
+        recording_service = RecordingService(udid)
+        
+        # Store recording service in session for later access
+        if not hasattr(session, 'recording_service'):
+            session.recording_service = recording_service
+        
+        result = recording_service.start_recording()
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "message": result["message"],
+                "session_id": session_id
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["error"])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting recording: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{session_id}/recording/stop")
+async def stop_recording(session_id: str):
+    """Stop video recording and return the recorded file"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = session_manager.get_session(session_id)
+        
+        # Check if recording service exists
+        if not hasattr(session, 'recording_service') or not session.recording_service:
+            raise HTTPException(status_code=400, detail="No recording in progress")
+        
+        recording_service = session.recording_service
+        result = recording_service.stop_recording()
+        
+        if result["success"]:
+            file_path = result["file_path"]
+            
+            # Read the video file
+            if os.path.exists(file_path):
+                with open(file_path, 'rb') as f:
+                    video_data = f.read()
+                
+                # Clean up the file after reading
+                recording_service.cleanup_recording_file(file_path)
+                
+                # Generate filename
+                timestamp = int(time.time())
+                filename = f"ios-recording_{session_id[:8]}_{timestamp}.mp4"
+                
+                # Return as downloadable MP4 response
+                return Response(
+                    content=video_data,
+                    media_type="video/mp4",
+                    headers={
+                        "Content-Disposition": f"attachment; filename={filename}",
+                        "Content-Length": str(len(video_data))
+                    }
+                )
+            else:
+                raise HTTPException(status_code=500, detail="Recording file not found")
+        else:
+            raise HTTPException(status_code=500, detail=result["error"])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error stopping recording: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{session_id}/recording/status")
+async def get_recording_status(session_id: str):
+    """Get recording status for a session"""
+    try:
+        if not session_manager.get_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = session_manager.get_session(session_id)
+        
+        if hasattr(session, 'recording_service') and session.recording_service:
+            is_recording = session.recording_service.is_recording_active()
+        else:
+            is_recording = False
+        
+        return {
+            "success": True,
+            "session_id": session_id,
+            "is_recording": is_recording
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting recording status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cleanup-recordings")
+async def cleanup_all_recordings():
+    """Cleanup all active recordings (called on app shutdown)"""
+    try:
+        session_manager.cleanup_all_recordings()
+        return {
+            "success": True,
+            "message": "All recordings cleaned up"
+        }
+    except Exception as e:
+        logger.error(f"Error cleaning up recordings: {e}")
         raise HTTPException(status_code=500, detail=str(e))

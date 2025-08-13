@@ -3,7 +3,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.core.logging import logger
 from app.services.device_service import DeviceService
 from app.services.session_manager import session_manager
-from app.models.events import TapEvent, SwipeEvent, TextEvent, ButtonEvent
+from app.models.events import TapEvent, SwipeEvent, TextEvent, ButtonEvent, KeyEvent
 
 class ControlWebSocket:
     def __init__(self):
@@ -12,7 +12,7 @@ class ControlWebSocket:
     async def handle_connection(self, websocket: WebSocket, session_id: str):
         """Handle control WebSocket connection for a specific session"""
         await websocket.accept()
-        logger.info(f"Control WebSocket connected for session: {session_id}")
+        # logger.info(f"Control WebSocket connected for session: {session_id}")
         
         # Get UDID for this session
         udid = session_manager.get_session_udid(session_id)
@@ -62,6 +62,10 @@ class ControlWebSocket:
             elif event_type == "button":
                 event = ButtonEvent(**data)
                 await device_service.press_button(event.button)
+                
+            elif event_type == "key":
+                event = KeyEvent(**data)
+                await device_service.input_key(event.key, event.duration)
                 
         except Exception as e:
             logger.error(f"Message handling error: {e}")

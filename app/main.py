@@ -256,6 +256,12 @@ async def health_check():
 def cleanup():
     """Cleanup on shutdown"""
     logger.info("Cleaning up services...")
+    try:
+        # Cleanup any active recordings
+        session_manager.cleanup_all_recordings()
+        logger.info("All recordings cleaned up successfully")
+    except Exception as e:
+        logger.error(f"Error during recording cleanup: {e}")
     # try:
     #     session_manager.delete_all_sessions()
     #     logger.info("All sessions cleaned up successfully")

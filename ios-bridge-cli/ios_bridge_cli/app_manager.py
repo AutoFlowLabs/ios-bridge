@@ -9,6 +9,7 @@ import json
 import tempfile
 import shutil
 import psutil
+import signal
 from typing import Dict, Optional, Any
 from pathlib import Path
 
@@ -163,16 +164,28 @@ class ElectronAppManager:
             if self.verbose:
                 print(f"🚀 Starting Electron app: {' '.join(args)}")
             
-            # Start the process - always show output for debugging
+            # Start the process - show stderr always to catch critical errors
+            stdout_target = None if self.verbose else subprocess.DEVNULL
+            stderr_target = None  # Always show stderr for critical errors
+            
+            # Create process in new process group for better signal handling
             self.process = subprocess.Popen(
                 args,
                 cwd=self.app_path,
-                stdout=None,  # Always show stdout
-                stderr=None   # Always show stderr
+                stdout=stdout_target,
+                stderr=stderr_target,
+                preexec_fn=os.setsid if hasattr(os, 'setsid') else None
             )
             
-            # Wait for the process to complete
-            return_code = self.process.wait()
+            # Wait for the process to complete with proper KeyboardInterrupt handling
+            try:
+                return_code = self.process.wait()
+            except KeyboardInterrupt:
+                # Handle Ctrl+C gracefully
+                if self.verbose:
+                    print("\n🛑 Stopping Electron app...")
+                self.stop()
+                return 0
             
             if return_code != 0 and self.verbose:
                 stdout, stderr = self.process.communicate()
@@ -194,19 +207,39 @@ class ElectronAppManager:
         """Stop the Electron app"""
         if self.process:
             try:
-                # Gracefully terminate
+                pid = self.process.pid
+                
+                # Try graceful termination first
                 self.process.terminate()
                 
                 # Wait for termination
                 try:
-                    self.process.wait(timeout=5)
+                    self.process.wait(timeout=2)
+                    if self.verbose:
+                        print("✅ Electron app stopped gracefully")
                 except subprocess.TimeoutExpired:
                     # Force kill if it doesn't terminate gracefully
-                    self.process.kill()
-                    self.process.wait()
-                
-                if self.verbose:
-                    print("✅ Electron app stopped")
+                    if self.verbose:
+                        print("⚡ Force killing Electron app...")
+                    
+                    # Kill the process group if possible
+                    try:
+                        if hasattr(os, 'killpg'):
+                            os.killpg(os.getpgid(pid), signal.SIGTERM)
+                            time.sleep(0.5)
+                            try:
+                                os.killpg(os.getpgid(pid), signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass  # Process already terminated
+                        else:
+                            self.process.kill()
+                        self.process.wait()
+                    except ProcessLookupError:
+                        # Process already terminated
+                        pass
+                    
+                    if self.verbose:
+                        print("✅ Electron app force killed")
                     
             except Exception as e:
                 if self.verbose:

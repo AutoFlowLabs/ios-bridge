@@ -54,7 +54,7 @@ class VideoWebSocket:
                     
                     # Log performance
                     if current_time - last_fps_update > 3:
-                        logger.info(f"🎥 Video streaming: {current_fps} FPS, Queue: {self.video_service.video_frame_queue.qsize()}")
+                        # logger.info(f"🎥 Video streaming: {current_fps} FPS, Queue: {self.video_service.video_frame_queue.qsize()}")
                         last_fps_update = current_time
                 else:
                     await asyncio.sleep(0.01)

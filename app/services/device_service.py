@@ -115,6 +115,30 @@ class DeviceService:
             logger.error(f"Text input error: {e}")
             return False
     
+    async def input_key(self, key: str, duration: float = None) -> bool:
+        """Input individual key"""
+        if not self.udid:
+            logger.error("No UDID set for key input")
+            return False
+            
+        try:
+            cmd = ["idb", "ui", "key", key, "--udid", self.udid]
+            if duration is not None:
+                cmd.extend(["--duration", str(duration)])
+                
+            result = subprocess.run(cmd, capture_output=True, text=True, 
+                                  timeout=settings.TEXT_TIMEOUT)
+            
+            if result.returncode == 0:
+                logger.info(f"✅ Key entered: {key}")
+                return True
+            else:
+                logger.error(f"❌ Key failed: {key} - {result.stderr}")
+                return False
+        except Exception as e:
+            logger.error(f"Key input error: {e}")
+            return False
+    
     async def press_button(self, button: str) -> bool:
         """Press device button"""
         if not self.udid:

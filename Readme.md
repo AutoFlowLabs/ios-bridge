@@ -8,6 +8,7 @@ A comprehensive remote control solution for iOS simulators built with FastAPI an
 * [Prerequisites](#-prerequisites)
 * [Installation](#-installation)
 * [Features](#-features)
+* [Electron Desktop App](#-electron-desktop-app)
 * [Architecture](#️-architecture)
 * [Usage](#-usage)
 * [API Reference](#-api-reference)
@@ -18,7 +19,7 @@ A comprehensive remote control solution for iOS simulators built with FastAPI an
 
 ## 🌟 Overview
 
-This project provides a complete remote control solution for iOS simulators, enabling developers and testers to interact with iOS devices through a web browser. It combines real-time video streaming (WebRTC/WebSocket), gesture controls, app management, and persistent session storage in a unified FastAPI-based platform.
+This project provides a complete remote control solution for iOS simulators, enabling developers and testers to interact with iOS devices through both a web browser and a native Electron desktop application. It combines real-time video streaming (WebRTC/WebSocket), gesture controls, app management, video recording, and persistent session storage in a unified FastAPI-based platform.
 
 ## 🖥️ System Requirements
 
@@ -99,18 +100,22 @@ xcrun simctl list runtimes
 
 **Simulator Control**
 * **Touch Interactions**: Precise tap and swipe gestures with coordinate mapping
+* **Predefined Swipe Gestures**: Quick swipe controls (⬆️ Up, ⬇️ Down, ⬅️ Left, ➡️ Right)
 * **Hardware Buttons**: Home, lock, volume, Siri, Apple Pay, shake simulation
-* **Text Input**: Send text directly to simulator input fields
+* **Text Input**: Send text directly to simulator input fields with real-time keyboard mode
+* **Real-time Keyboard**: Live key-by-key input using HID usage codes for natural typing
 * **Device Configuration**: Support for all iOS device types and versions (iPhone, iPad)
 * **Real-time Status**: Live simulator state monitoring and health checks
 
 ### 🚀 Advanced Features
 
-**Video Streaming**
+**Video Streaming & Recording**
 * **Multiple Modes**: WebSocket video streaming and WebRTC for real-time interaction
 * **Screenshot Mode**: High-quality static image capture with on-demand updates
 * **Performance Control**: Dynamic quality adjustment and frame rate control
 * **Stream Management**: Per-session streaming with quality presets (low, medium, high, ultra)
+* **Video Recording**: MP4 video recording with automatic download functionality
+* **Emergency Recording Save**: Automatic recording preservation on app exit
 
 **App Management**
 * **IPA Installation**: Automatic app installation with simulator compatibility modifications
@@ -125,75 +130,400 @@ xcrun simctl list runtimes
 * **REST API**: Complete CRUD operations for sessions and app management
 * **Session-Aware**: All operations are scoped to specific simulator sessions
 * **Error Handling**: Comprehensive error reporting and graceful degradation
+
+## 🖥️ Electron Desktop App
+
+### iOS Bridge CLI
+
+A powerful command-line interface with integrated Electron desktop application for native iOS simulator control.
+
+#### 🚀 **Key Features**
+
+**Desktop Streaming Window**
+* **Native Application**: Full-featured Electron app with native window controls
+* **High-Performance Streaming**: Real-time iOS simulator video streaming
+* **Touch Controls**: Direct mouse/trackpad interaction with the simulator
+* **Minimize/Close**: Functional window management buttons
+* **Auto-Scaling**: Responsive simulator display that adapts to window size
+
+**Advanced Input Methods**
+* **Predefined Swipe Gestures**: Quick-access swipe buttons with dropdown menu
+  - ⬆️ **Swipe Up**: Perfect for Control Center, app switching
+  - ⬇️ **Swipe Down**: Notification Center, search
+  - ⬅️ **Swipe Left**: Navigation, page transitions
+  - ➡️ **Swipe Right**: Back navigation, page transitions
+* **Dual Keyboard Modes**:
+  - 📝 **Batch Mode**: Type text and send as complete messages
+  - ⚡ **Real-time Mode**: Live key-by-key input with HID usage codes
+* **Hardware Controls**: One-click access to device functions
+  - 🏠 **Home Button**: Return to home screen
+  - 🔒 **Lock Device**: Instant device lock/unlock
+  - 📸 **Screenshot**: Capture and auto-download device screenshots
+
+**Video Recording System**
+* **Professional Recording**: MP4 video recording using `idb record-video`
+* **Smart Controls**: 
+  - 🔴 **Start Recording**: Begin video capture with visual feedback
+  - ⏹️ **Stop Recording**: End recording and auto-download MP4 file
+* **Emergency Safety**: Automatic recording preservation on app exit
+* **Intelligent Naming**: `ios-recording_<session>_<timestamp>.mp4`
+
+#### ⌨️ **Keyboard Shortcuts**
+
+| Shortcut | Action | Description |
+|----------|--------|-------------|
+| **F1** | Home | Return to iOS home screen |
+| **F2** | Screenshot | Capture and download screenshot |
+| **F3** | Device Info | Show device information modal |
+| **F4** | Toggle Keyboard | Open/close keyboard input panel |
+| **F5** | Lock Device | Lock/unlock the iOS device |
+| **F6** | Start Recording | Begin video recording |
+| **F7** | Stop Recording | End recording and download video |
+
+#### 🎛️ **Desktop Interface Features**
+
+**Window Controls**
+* **Draggable Header**: Native window drag functionality
+* **Minimize Button**: Minimize app to dock/taskbar
+* **Close Button**: Safe app closure with recording cleanup
+* **Settings Menu**: Quality controls and configuration options
+
+**Real-time Keyboard Panel**
+* **Toggle Interface**: Slide-down keyboard input panel
+* **Mode Switching**: Toggle between batch and real-time input modes
+* **Visual Feedback**: Live keystroke confirmation and status
+* **Auto-focus**: Intelligent input field focusing
+
+**Recording Interface**
+* **Status Indicators**: Visual recording state with pulsing animations
+* **Button States**: Dynamic show/hide of start/stop controls
+* **Progress Feedback**: Real-time recording status updates
+* **Safe Termination**: Graceful recording stop on app exit
+
+#### 📦 **CLI Installation & Usage**
+
+**Installation**
+```bash
+# Install the iOS Bridge CLI
+pip install ios-bridge-cli
+
+# Or install from source
+cd ios-bridge-cli
+pip install -e .
+```
+
+**Basic Usage**
+```bash
+# Stream iOS simulator in desktop window
+ios-bridge stream
+
+# Stream with specific server configuration
+ios-bridge stream --host localhost --port 8000
+
+# Stream with session selection
+ios-bridge stream --session-id <session-id>
+
+# Start server (if not running)
+ios-bridge server --port 8000
+```
+
+**Advanced CLI Options**
+```bash
+# Enable verbose logging
+ios-bridge stream --verbose
+
+# Custom server URL
+ios-bridge stream --server-url http://localhost:8000
+
+# Force specific session
+ios-bridge stream --session-id abc123 --force
+
+# Stream with recording auto-start
+ios-bridge stream --auto-record
+```
+
+#### 🔧 **Desktop App Configuration**
+
+**Settings Panel**
+* **Video Quality**: Low, Medium, High, Ultra presets
+* **Stream Mode**: WebSocket vs WebRTC selection
+* **Recording Settings**: Default save location, quality settings
+* **Keyboard Settings**: Real-time mode preferences
+
+**Window Management**
+* **Always on Top**: Keep app visible during development
+* **Fullscreen Mode**: Immersive simulator interaction
+* **Window Size Memory**: Remembers preferred window dimensions
+* **Multi-Monitor Support**: Works across multiple displays
+
+#### 🛡️ **Safety & Reliability**
+
+**Graceful Shutdown**
+* **Recording Protection**: Automatically stops and saves recordings on exit
+* **Session Cleanup**: Proper WebSocket connection cleanup
+* **Process Management**: Clean Electron process termination
+* **Emergency Recovery**: Saves recordings to Downloads folder on forced exit
+
+**Error Handling**
+* **Connection Recovery**: Automatic reconnection on network issues
+* **Session Validation**: Ensures valid session before connecting
+* **Fallback Modes**: Graceful degradation when features unavailable
+* **User Feedback**: Clear error messages and status indicators
+
+#### 💡 **Use Cases**
+
+**Development Workflow**
+* **Live Testing**: Real-time app testing with immediate feedback
+* **Screen Recording**: Capture demos and bug reports
+* **Multiple Devices**: Quick switching between different iOS simulators
+* **Gesture Testing**: Test swipe gestures and touch interactions
+
+**Quality Assurance**
+* **Test Documentation**: Record test sessions for review
+* **Bug Reproduction**: Capture exact steps and interactions
+* **Cross-Device Testing**: Test across multiple iOS device types
+* **Automated Screenshots**: Quick capture for documentation
+
+**Presentations & Demos**
+* **Live Demos**: Present iOS apps in native desktop environment
+* **Training Materials**: Record tutorials and walkthroughs
+* **Client Presentations**: Professional app demonstrations
+* **Documentation**: Create visual guides and tutorials
 ## 🏗️ Architecture
 
-### System Overview
+### Complete System Architecture
+
+The iOS Bridge platform supports two main interface modes: **Web Interface** (browser-based) and **Desktop App** (Electron CLI-based). Both connect to the same FastAPI server backend.
+
+#### **Desktop App Architecture (CLI + Electron)**
 
 ```
-┌─────────────────┐    WebSocket/HTTP    ┌─────────────────┐
-│   Web Frontend  │ ←→ ←→ ←→ ←→ ←→ ←→ │  FastAPI Server │
+┌─────────────────┐    HTTP/REST     ┌─────────────────┐    WebSocket    ┌─────────────────┐
+│   Python CLI    │ ←──────────────→ │  FastAPI Server │ ←─────────────→ │ Electron Desktop│
+│                 │                  │                 │                 │ Application     │
+│ • Session List  │                  │ • Session Mgmt  │                 │                 │
+│ • Validation    │                  │ • REST API      │                 │ • Video Stream  │
+│ • App Launch    │                  │ • WebSocket Hub │                 │ • Touch Input   │
+│ • Process Mgmt  │                  │ • Recording Svc │                 │ • Keyboard I/O  │
+│ • Config Mgmt   │                  │ • Device Ctrl   │                 │ • Recording UI  │
+└─────────────────┘                  └─────────────────┘                 │ • Gesture Ctrl  │
+       ↓ IPC                                  ↓                           │ • Native UI     │
+┌─────────────────┐                  ┌─────────────────┐                 └─────────────────┘
+│ Electron Main   │                  │ Session Manager │
+│   Process       │                  │                 │
+│                 │                  │ • JSON Storage  │
+│ • Window Mgmt   │                  │ • Validation    │
+│ • Menu System   │                  │ • Recovery      │
+│ • Lifecycle     │                  │ • Backup/Restore│
+│ • Cleanup       │                  └─────────────────┘
+│ • Signal Handle │                           ↓
+└─────────────────┘                  ┌─────────────────┐
+                                     │ iOS Sim Manager │
+                                     │                 │
+                                     │ • xcrun simctl  │
+                                     │ • Device Control│
+                                     │ • App Lifecycle │
+                                     │ • Process Track │
+                                     └─────────────────┘
+                                              ↓
+                                     ┌─────────────────┐
+                                     │ IDB Integration │
+                                     │                 │
+                                     │ • Device Bridge │
+                                     │ • HID Input     │
+                                     │ • Video Record  │
+                                     │ • File Transfer │
+                                     └─────────────────┘
+                                              ↓
+                                     ┌─────────────────┐
+                                     │ iOS Simulators  │
+                                     │                 │
+                                     │ • Multiple UDID │
+                                     │ • Concurrent    │
+                                     │ • Persistent    │
+                                     └─────────────────┘
+```
+
+#### **Web Interface Architecture (Browser-based)**
+
+```
+┌─────────────────┐    HTTP/WebSocket   ┌─────────────────┐
+│   Web Browser   │ ←─────────────────→ │  FastAPI Server │
 │                 │                     │                 │
-│ • Video Stream  │                     │ • Session Mgmt  │
-│ • WebRTC        │                     │ • App Control   │
-│ • Touch Input   │                     │ • WebSocket     │
-│ • Controls UI   │                     │ • Persistence   │
-└─────────────────┘                     └─────────────────┘
-                                                 ↓
-                                        ┌─────────────────┐
-                                        │ Session Manager │
-                                        │                 │
-                                        │ • JSON Storage  │
-                                        │ • Validation    │
-                                        │ • Recovery      │
-                                        │ • Cleanup       │
+│ • HTML5 Canvas  │                     │ • Session Mgmt  │
+│ • WebSocket JS  │                     │ • REST API      │
+│ • Touch Events  │                     │ • WebSocket Hub │
+│ • WebRTC        │                     │ • Video Stream  │
+│ • File Upload   │                     │ • Control WS    │
+│ • Responsive UI │                     │ • Screenshot WS │
+└─────────────────┘                     │ • WebRTC WS     │
                                         └─────────────────┘
                                                  ↓
                                         ┌─────────────────┐
-                                        │ iOS Simulator   │
-                                        │ Manager         │
+                                        │ WebSocket       │
+                                        │ Services        │
                                         │                 │
-                                        │ • xcrun simctl  │
-                                        │ • Device Ctrl   │
-                                        │ • App Mgmt      │
+                                        │ • VideoWebSocket│
+                                        │ • ControlWS     │
+                                        │ • ScreenshotWS  │
+                                        │ • WebRTCWS      │
                                         └─────────────────┘
                                                  ↓
-                                        ┌─────────────────┐
-                                        │ iOS Simulators  │
-                                        │                 │
-                                        │ • Session 1     │
-                                        │ • Session 2     │
-                                        │ • Session N     │
-                                        └─────────────────┘
+                                    [Same backend infrastructure as Desktop App]
 ```
 
-### Component Breakdown
+#### **Unified Backend Infrastructure**
 
-**FastAPI Application (`main.py`)**
-* Lifespan management with startup/shutdown hooks
-* Orphaned simulator recovery on application startup
-* WebSocket endpoints for control, video, WebRTC, and screenshots
-* Session-aware routing with validation
-* Health check and status endpoints
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           FastAPI Server Core                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ REST Endpoints │ WebSocket Hub │ Session Manager │ Recording Service       │
+│                │               │                 │                         │
+│ • /api/sessions│ • Video Stream│ • JSON Storage  │ • idb record-video     │
+│ • /api/apps    │ • Control I/O │ • Validation    │ • Emergency Save       │
+│ • /api/recording│ • Screenshot │ • Recovery      │ • MP4 Download         │
+│ • /health      │ • WebRTC      │ • Cleanup       │ • Process Management   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        iOS Device Management Layer                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ iOS Simulator Manager │ Device Service │ IDB Integration │ System Utils    │
+│                       │                │                 │                 │
+│ • xcrun simctl        │ • Touch/Swipe  │ • Video Record  │ • Process Track │
+│ • Device Create/Boot  │ • Button Press │ • HID Keyboard  │ • File Mgmt     │
+│ • App Install/Launch  │ • Text Input   │ • Screenshot    │ • Cleanup       │
+│ • UDID Management     │ • Coordinate   │ • Device Lock   │ • Error Handle  │
+│ • State Monitoring    │   Translation  │ • File Transfer │ • Logging       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           macOS System Layer                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Xcode/iOS Simulator │ Facebook IDB │ FFmpeg │ System Commands              │
+│                     │              │        │                              │
+│ • Simulator Runtime │ • idb daemon │ • Video│ • Process Management         │
+│ • Device Types      │ • Device Com │   Proc │ • File System Operations     │
+│ • iOS Versions      │ • Automation │ • Stream│ • Network I/O                │
+│ • Hardware Sim      │ • Testing    │   Enc  │ • Signal Handling            │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
-**Session Manager (`session_manager.py`)**
-* Persistent JSON-based session storage
-* Automatic session validation and cleanup
-* Orphaned simulator detection and recovery
-* Thread-safe session operations
-* Backup and restore functionality
+### Detailed Component Analysis
 
-**iOS Simulator Manager (`ios_sim_manager_service.py`)**
-* Core simulator lifecycle management (create, boot, shutdown, delete)
-* App installation with simulator compatibility fixes
-* Device control via `xcrun simctl`
-* PID tracking and process management
-* Comprehensive error handling and logging
+#### **Client Interface Components**
 
-**WebSocket Services**
-* `ControlWebSocket`: Device control and touch input
-* `VideoWebSocket`: Real-time video streaming
-* `WebRTCWebSocket`: WebRTC-based streaming
-* `ScreenshotWebSocket`: High-quality screenshot capture
+**1. Desktop Application (Electron + Python CLI)**
+- **Python CLI Layer**: Command-line interface using Click framework
+  - Session validation and API client communication
+  - Electron app lifecycle management and process spawning
+  - Configuration handling and environment setup
+  - Graceful shutdown and cleanup orchestration
+  
+- **Electron Main Process**: Native desktop window management
+  - Window creation, resizing, and lifecycle management
+  - Menu system with keyboard shortcuts (F1-F7)
+  - IPC communication between main and renderer processes
+  - Signal handling for clean app termination
+  
+- **Electron Renderer Process**: Real-time UI and streaming
+  - WebSocket client for video streaming and device control
+  - HTML5 Canvas for hardware-accelerated video rendering
+  - Touch input translation (mouse coordinates → device coordinates)
+  - Real-time keyboard input with HID usage code mapping
+  - Recording controls with start/stop and emergency save
+  - Gesture controls with predefined swipe directions
+  
+**2. Web Interface (Browser-based)**
+- **Frontend JavaScript**: Vanilla JS for maximum performance
+  - WebSocket client management with auto-reconnection
+  - Canvas-based video rendering with frame queuing
+  - Touch event handling and coordinate mapping
+  - WebRTC support for low-latency streaming
+  - Responsive design for various screen sizes
+  
+- **HTML5 Interface**: Modern web standards
+  - Semantic HTML5 structure with accessibility support
+  - CSS Grid/Flexbox for responsive layout
+  - Progressive Web App (PWA) capabilities
+  - File upload for IPA installation
+
+#### **Server Infrastructure Components**
+
+**FastAPI Application Core (`main.py`)**
+- **Application Lifespan**: Startup/shutdown hooks with graceful cleanup
+- **Orphaned Recovery**: Automatic detection and session restoration on startup
+- **WebSocket Hub**: Centralized management of multiple WebSocket endpoints
+- **Session-aware Routing**: All operations scoped to specific simulator sessions
+- **Health Monitoring**: Comprehensive health checks and status endpoints
+- **Error Handling**: Global exception handling with detailed error reporting
+
+**Session Management Layer (`session_manager.py`)**
+- **Persistent Storage**: JSON-based session storage with atomic writes
+- **Validation Engine**: Real-time session health checks and validation
+- **Recovery System**: Automatic orphaned simulator detection and session restoration
+- **Concurrency Support**: Thread-safe operations for multiple concurrent sessions
+- **Backup System**: Automated backup rotation with configurable retention
+- **Hot Reload**: Development-friendly session persistence across server restarts
+
+**iOS Simulator Management (`ios_sim_manager_service.py`)**
+- **Device Lifecycle**: Complete simulator management (create, boot, shutdown, delete)
+- **App Management**: IPA installation with automatic simulator compatibility fixes
+- **Process Monitoring**: PID tracking and process health monitoring
+- **Device Control**: Integration with `xcrun simctl` for hardware simulation
+- **State Synchronization**: Real-time device state monitoring and updates
+- **Error Recovery**: Comprehensive error handling with automatic retry logic
+
+**Recording Service (`recording_service.py`)**
+- **Video Recording**: MP4 recording using `idb record-video` with quality settings
+- **Process Management**: Graceful recording start/stop with SIGTERM handling
+- **Emergency Save**: Automatic recording preservation on unexpected app termination
+- **File Management**: Temporary file handling with automatic cleanup
+- **Download System**: Secure file download with automatic post-download cleanup
+
+**WebSocket Services Hub**
+- **ControlWebSocket**: Real-time device control and input handling
+  - Touch events (tap, swipe) with coordinate translation
+  - Keyboard input with HID usage code mapping
+  - Hardware button simulation (home, lock, volume)
+  - Text input forwarding with encoding support
+- **VideoWebSocket**: High-performance video streaming
+  - Base64 JPEG frame encoding with metadata
+  - Dynamic quality adjustment and frame rate control
+  - Frame queuing and buffer management
+- **WebRTCWebSocket**: Low-latency streaming for modern browsers
+  - Peer-to-peer connection establishment
+  - Adaptive bitrate and quality control
+  - ICE candidate handling and connection management
+- **ScreenshotWebSocket**: High-quality screenshot capture
+  - On-demand screenshot generation
+  - Multiple format support (PNG, JPEG)
+  - Compression and quality optimization
+
+#### **Device Integration Layer**
+
+**Device Service (`device_service.py`)**
+- **Input Translation**: Coordinate mapping for different device types and orientations
+- **Gesture Processing**: Complex gesture recognition and execution
+- **Hardware Simulation**: Complete hardware button and sensor simulation
+- **Text Processing**: Unicode text input with proper encoding
+- **Response Handling**: Asynchronous command execution with error handling
+
+**IDB Integration**
+- **Device Bridge**: Facebook IDB for advanced device automation
+- **HID Input**: Hardware-level keyboard input using HID usage codes
+- **Video Recording**: Professional-quality MP4 recording
+- **File Transfer**: Bidirectional file transfer capabilities
+- **Device Lock**: Secure device lock/unlock functionality
+
+#### **System Integration**
+
+**macOS System Layer**
+- **Xcode Integration**: Deep integration with iOS Simulator runtime
+- **Process Management**: System-level process tracking and cleanup
+- **File System**: Secure file operations with proper permissions
+- **Network Stack**: WebSocket and HTTP server with SSL/TLS support
 
 ## 📦 Installation
 
@@ -347,6 +677,21 @@ POST /api/sessions/{session_id}/apps/{bundle_id}/terminate
 DELETE /api/sessions/{session_id}/apps/{bundle_id}
 ```
 
+**Video Recording**
+```bash
+# Start recording
+POST /api/sessions/{session_id}/recording/start
+
+# Stop recording and download MP4
+POST /api/sessions/{session_id}/recording/stop
+
+# Get recording status
+GET /api/sessions/{session_id}/recording/status
+
+# Cleanup all recordings (emergency stop)
+POST /api/sessions/cleanup-recordings
+```
+
 **Status & Health**
 ```bash
 # Application health check
@@ -397,6 +742,12 @@ controlSocket.send(JSON.stringify({
 controlSocket.send(JSON.stringify({
     type: 'text',
     text: 'Hello World'
+}));
+
+// Send individual key presses (real-time keyboard)
+controlSocket.send(JSON.stringify({
+    type: 'key',
+    key: '11' // HID usage code for 'H'
 }));
 ```
 
@@ -648,6 +999,38 @@ xcrun simctl list devices | grep Booted
 curl "http://localhost:8000/api/sessions/"
 ```
 
+**7. Electron Desktop App issues**
+```bash
+# Common issues:
+# - WebSocket connection failures
+# - Recording not starting/stopping
+# - Keyboard input not working
+
+# Check server connection
+curl "http://localhost:8000/health"
+
+# Verify recording endpoints
+curl -X POST "http://localhost:8000/api/sessions/{session_id}/recording/start"
+
+# Check real-time keyboard mode
+# Ensure HID usage codes are being sent correctly
+```
+
+**8. Video recording problems**
+```bash
+# Recording not stopping on app exit
+# - Check idb process: ps aux | grep idb
+# - Manually kill if needed: killall -TERM idb
+
+# Recording file not found
+# - Check Downloads folder for emergency saves
+# - Look for files named: ios-recording-emergency_*
+
+# Recording permission issues
+# - Ensure idb has proper permissions
+# - Check iOS Simulator accessibility settings
+```
+
 ### Debug Commands
 
 ```bash
@@ -665,6 +1048,20 @@ curl "http://localhost:8000/api/sessions/refresh"
 
 # Clean up storage
 curl -X POST "http://localhost:8000/api/sessions/cleanup"
+
+# Check recording status
+curl "http://localhost:8000/api/sessions/{session_id}/recording/status"
+
+# Emergency stop all recordings
+curl -X POST "http://localhost:8000/api/sessions/cleanup-recordings"
+
+# Test swipe gestures
+curl -X POST "http://localhost:8000/ws/{session_id}/control" \
+  -d '{"t":"swipe","start_x":195,"start_y":500,"end_x":195,"end_y":300,"duration":0.3}'
+
+# Test key input (real-time keyboard)
+curl -X POST "http://localhost:8000/ws/{session_id}/control" \
+  -d '{"t":"key","key":"11"}' # HID code for 'H'
 ```
 
 ### Log Analysis

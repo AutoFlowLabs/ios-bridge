@@ -22,6 +22,11 @@ class ButtonEvent(BaseModel):
     t: str = "button"
     button: str
 
+class KeyEvent(BaseModel):
+    t: str = "key"
+    key: str
+    duration: Optional[float] = None
+
 class RefreshEvent(BaseModel):
     t: str = "refresh"
 

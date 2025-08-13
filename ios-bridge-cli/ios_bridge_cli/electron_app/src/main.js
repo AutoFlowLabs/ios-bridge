@@ -1,3 +1,6 @@
+// Suppress Electron security warnings in production
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+
 const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -54,8 +57,58 @@ class IOSBridgeApp {
             app.quit();
         });
         
-        app.on('before-quit', () => {
+        app.on('before-quit', async (event) => {
+            if (!this.isQuitting) {
+                event.preventDefault(); // Prevent quit until cleanup is done
+                this.isQuitting = true;
+                
+                console.log('🧹 Starting cleanup process...');
+                
+                // Cleanup recordings before quitting
+                if (this.iosBridgeProcess && this.config) {
+                    try {
+                        const serverUrl = this.getServerUrl();
+                        console.log('🎬 Stopping all recordings...');
+                        
+                        // Give it more time and better error handling
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+                        
+                        await fetch(`${serverUrl}/api/sessions/cleanup-recordings`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            signal: controller.signal
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        console.log('✅ Recording cleanup completed');
+                        
+                        // Small delay to ensure cleanup completes
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                    } catch (error) {
+                        console.error('❌ Error during recording cleanup:', error);
+                    }
+                }
+                
+                console.log('🧹 Cleanup completed, proceeding with quit...');
+                app.quit(); // Now actually quit
+            }
+        });
+        
+        // Handle external termination signals
+        process.on('SIGTERM', () => {
             this.isQuitting = true;
+            app.quit();
+            // Force exit after 2 seconds if app.quit() doesn't work
+            setTimeout(() => process.exit(0), 2000);
+        });
+        
+        process.on('SIGINT', () => {
+            this.isQuitting = true;
+            app.quit();
+            // Force exit after 2 seconds if app.quit() doesn't work
+            setTimeout(() => process.exit(0), 2000);
         });
     }
     
@@ -128,7 +181,7 @@ class IOSBridgeApp {
                 const windowWidth = scaledContentWidth + shellPadding; // add horizontal shell padding
                 const windowHeight = scaledContentHeight + shellPadding + headerHeight + footerHeight;
                 
-                console.log(`Resizing window: Original ${width}x${height}, Scaled content ${scaledContentWidth}x${scaledContentHeight} (scale: ${scaleFactor.toFixed(2)}), Window ${windowWidth}x${windowHeight}`);
+                // Window resized
                 
                 // Update min size constraints to allow shrinking when orientation or stream size changes
                 try {
@@ -233,12 +286,15 @@ class IOSBridgeApp {
         // Development tools - always enable for debugging
         this.mainWindow.webContents.openDevTools();
         
-        // Forward console messages to main process
-        console.log('='.repeat(60));
-        console.log('MAIN PROCESS: Setting up console message forwarding');
-        console.log('='.repeat(60));
-        
+        // Forward console messages to main process (but filter out noisy ones)
         this.mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+            // Skip noisy security warnings and autofill messages
+            if (message.includes('Content-Security-Policy') || 
+                message.includes('Autofill.enable') || 
+                message.includes('Autofill.setAddresses')) {
+                return;
+            }
+            
             const levelMap = { 0: 'LOG', 1: 'WARN', 2: 'ERROR' };
             const levelName = levelMap[level] || 'LOG';
             console.log(`[RENDERER-${levelName}] ${message}`);
@@ -326,12 +382,32 @@ class IOSBridgeApp {
                             this.mainWindow?.webContents.send('device-action', 'info');
                         }
                     },
-                    { type: 'separator' },
+                    {
+                        label: 'Toggle Keyboard',
+                        accelerator: 'F4',
+                        click: () => {
+                            this.mainWindow?.webContents.send('device-action', 'keyboard');
+                        }
+                    },
                     {
                         label: 'Lock Device',
-                        accelerator: 'CmdOrCtrl+L',
+                        accelerator: 'F5',
                         click: () => {
                             this.mainWindow?.webContents.send('device-action', 'lock');
+                        }
+                    },
+                    {
+                        label: 'Start Recording',
+                        accelerator: 'F6',
+                        click: () => {
+                            this.mainWindow?.webContents.send('device-action', 'record');
+                        }
+                    },
+                    {
+                        label: 'Stop Recording',
+                        accelerator: 'F7',
+                        click: () => {
+                            this.mainWindow?.webContents.send('device-action', 'stop-record');
                         }
                     }
                 ]

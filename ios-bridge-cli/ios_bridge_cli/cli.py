@@ -30,11 +30,52 @@ class CLIContext:
 
     def cleanup(self):
         """Run all cleanup handlers"""
+        click.echo("🧹 Starting cleanup process...")
+        
+        # Cleanup recordings first
+        if self.client:
+            try:
+                click.echo("🎬 Stopping any active recordings...")
+                import requests
+                import time
+                
+                # Get server URL from client config
+                server_url = f"http://{self.client.host}:{self.client.port}"
+                
+                # Call cleanup endpoint with timeout
+                response = requests.post(
+                    f"{server_url}/api/sessions/cleanup-recordings",
+                    timeout=5,
+                    headers={'Content-Type': 'application/json'}
+                )
+                
+                if response.status_code == 200:
+                    click.echo("✅ Recording cleanup completed")
+                else:
+                    click.echo(f"⚠️ Recording cleanup returned status {response.status_code}")
+                    
+                # Small delay to ensure cleanup completes
+                time.sleep(0.5)
+                
+            except Exception as e:
+                click.echo(f"⚠️ Error during recording cleanup: {e}")
+        
+        # Stop app manager
+        if self.app_manager:
+            try:
+                click.echo("🖥️ Stopping desktop app...")
+                self.app_manager.stop()
+            except Exception as e:
+                click.echo(f"Error stopping app manager: {e}", err=True)
+        
+        # Run other cleanup handlers
         for handler in self.cleanup_handlers:
             try:
                 handler()
             except Exception as e:
                 click.echo(f"Cleanup error: {e}", err=True)
+        
+        click.echo("✅ Cleanup completed")
 
 
 # Global context instance
@@ -44,8 +85,13 @@ cli_context = CLIContext()
 def signal_handler(signum, frame):
     """Handle Ctrl+C and other signals"""
     click.echo("\n🛑 Shutting down iOS Bridge CLI...")
-    cli_context.cleanup()
-    sys.exit(0)
+    try:
+        cli_context.cleanup()
+    except Exception as e:
+        click.echo(f"Error during cleanup: {e}", err=True)
+    finally:
+        # Force exit to ensure we don't get stuck
+        os._exit(0)
 
 
 # Register signal handlers
@@ -239,7 +285,13 @@ def stream(ctx, session_id: str, quality: str, fullscreen: bool, always_on_top: 
         click.echo("🖥️  Opening desktop streaming window...")
         
         # This will block until the window is closed
-        cli_context.app_manager.start(config)
+        try:
+            cli_context.app_manager.start(config)
+        except KeyboardInterrupt:
+            click.echo("\n🛑 Stream interrupted by user")
+            if cli_context.app_manager:
+                cli_context.app_manager.stop()
+            raise
         
     except SessionNotFoundError as e:
         click.echo(f"❌ {e}", err=True)

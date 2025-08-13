@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: ws: wss: http: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https: ws: wss:;">
     <title>iOS Bridge Desktop</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -35,6 +36,54 @@
                 <button id="info-btn" class="control-btn" data-action="info" title="Device Info (F3)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                    </svg>
+                </button>
+                
+                <button id="keyboard-btn" class="control-btn" data-action="keyboard" title="Toggle Keyboard (F4)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 7v10c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V7c0-1.1.9-2 2-2h12c1.1 0 2 .9 2 2zm-2 0H6v10h12V7z"/>
+                        <rect x="8" y="9" width="1.5" height="1.5"/>
+                        <rect x="10" y="9" width="1.5" height="1.5"/>
+                        <rect x="12" y="9" width="1.5" height="1.5"/>
+                        <rect x="14" y="9" width="1.5" height="1.5"/>
+                        <rect x="7" y="11" width="1.5" height="1.5"/>
+                        <rect x="9" y="11" width="1.5" height="1.5"/>
+                        <rect x="11" y="11" width="1.5" height="1.5"/>
+                        <rect x="13" y="11" width="1.5" height="1.5"/>
+                        <rect x="15" y="11" width="1.5" height="1.5"/>
+                        <rect x="9" y="13" width="6" height="1.5"/>
+                    </svg>
+                </button>
+                
+                <button id="swipe-btn" class="control-btn dropdown-btn" title="Swipe Gestures">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M13 1v6h3l-4 5-4-5h3V1h2zm-2 16H8l5-4 5 4h-3v6h-2v-6z"/>
+                    </svg>
+                    <div class="dropdown-menu" id="swipe-menu">
+                        <div class="dropdown-item" data-swipe="up">⬆️ Swipe Up</div>
+                        <div class="dropdown-item" data-swipe="down">⬇️ Swipe Down</div>
+                        <div class="dropdown-item" data-swipe="left">⬅️ Swipe Left</div>
+                        <div class="dropdown-item" data-swipe="right">➡️ Swipe Right</div>
+                    </div>
+                </button>
+                
+                <button id="lock-btn" class="control-btn" data-action="lock" title="Lock Device (F5)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6z"/>
+                    </svg>
+                </button>
+                
+                <button id="record-btn" class="control-btn" data-action="record" title="Start Recording (F6)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                        <circle cx="12" cy="12" r="4" fill="currentColor"/>
+                    </svg>
+                </button>
+                
+                <button id="stop-record-btn" class="control-btn" data-action="stop-record" title="Stop Recording (F7)" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                        <rect x="8" y="8" width="8" height="8" fill="currentColor"/>
                     </svg>
                 </button>
                 
@@ -94,6 +143,27 @@
                 </div>
             </div>
         </main>
+        
+        <!-- Keyboard Input Section -->
+        <div id="keyboard-section" class="keyboard-section" style="display: none;">
+            <div class="keyboard-container">
+                <div class="keyboard-mode-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="realtime-mode-toggle">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">Real-time Mode (Live Typing)</span>
+                    </label>
+                </div>
+                <div class="keyboard-input-row">
+                    <input type="text" id="keyboard-input" placeholder="Type text to send to device..." maxlength="500">
+                    <button id="send-text-btn" class="keyboard-btn">Send</button>
+                    <button id="clear-text-btn" class="keyboard-btn secondary">Clear</button>
+                </div>
+                <div class="keyboard-hint" id="keyboard-hint">
+                    💡 Type directly on your keyboard when this panel is open. Press Enter to send text.
+                </div>
+            </div>
+        </div>
         
         <!-- Footer with status -->
         <footer class="footer">

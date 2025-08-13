@@ -16,6 +16,9 @@ class IOSBridgeRenderer {
         this.currentQuality = 'high';
         this.fpsCounter = 0;
         this.lastFpsUpdate = Date.now();
+        this.keyboardMode = false;
+        this.realtimeMode = false;
+        this.isRecording = false;
         
         // Initialize when DOM is ready
         if (document.readyState === 'loading') {
@@ -120,6 +123,66 @@ class IOSBridgeRenderer {
             });
         });
         
+        // Window control buttons
+        document.getElementById('minimize-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.minimizeWindow();
+        });
+        
+        document.getElementById('close-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.closeWindow();
+        });
+        
+        // Quality/Settings dropdown toggle
+        document.getElementById('quality-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.toggleQualityMenu();
+        });
+        
+        // Swipe dropdown toggle and menu items
+        document.getElementById('swipe-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.toggleSwipeMenu();
+        });
+        
+        document.querySelectorAll('#swipe-menu .dropdown-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const swipeDirection = e.currentTarget?.dataset?.swipe;
+                this.performSwipeGesture(swipeDirection);
+            });
+        });
+        
+        // Keyboard input section controls
+        document.getElementById('send-text-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.sendKeyboardText();
+        });
+        
+        document.getElementById('clear-text-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.clearKeyboardText();
+        });
+        
+        document.getElementById('keyboard-input')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.sendKeyboardText();
+            }
+        });
+        
+        // Real-time mode toggle
+        document.getElementById('realtime-mode-toggle')?.addEventListener('change', (e) => {
+            this.toggleRealtimeMode(e.target.checked);
+        });
+        
+        // Real-time keyboard input capture
+        document.getElementById('keyboard-input')?.addEventListener('keydown', (e) => {
+            if (this.realtimeMode) {
+                this.handleRealtimeKeyPress(e);
+            }
+        });
+        
         // Modal close
         document.getElementById('info-modal')?.addEventListener('click', (e) => {
             if (e.target.id === 'info-modal') {
@@ -137,6 +200,31 @@ class IOSBridgeRenderer {
         
         // Keyboard input
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
+        
+        // Listen for device actions from main process (menu shortcuts)
+        window.electronAPI?.onDeviceAction((action) => {
+            this.handleDeviceAction(action);
+        });
+        
+        // Close menus when clicking outside
+        document.addEventListener('click', (e) => {
+            const qualityBtn = document.getElementById('quality-btn');
+            const qualityMenu = document.getElementById('quality-menu');
+            const swipeBtn = document.getElementById('swipe-btn');
+            const swipeMenu = document.getElementById('swipe-menu');
+            
+            if (qualityBtn && qualityMenu && 
+                !qualityBtn.contains(e.target) && 
+                !qualityMenu.contains(e.target)) {
+                qualityMenu.classList.remove('show');
+            }
+            
+            if (swipeBtn && swipeMenu && 
+                !swipeBtn.contains(e.target) && 
+                !swipeMenu.contains(e.target)) {
+                swipeMenu.classList.remove('show');
+            }
+        });
     }
     
     setupCanvasEventListeners() {
@@ -181,6 +269,7 @@ class IOSBridgeRenderer {
             await this.connectWebSocket('video', wsUrls.video);
             
             // Connect to control WebSocket
+            console.log(`🔗 Connecting to control WebSocket: ${wsUrls.control}`);
             await this.connectWebSocket('control', wsUrls.control);
             
             this.isConnected = true;
@@ -203,6 +292,7 @@ class IOSBridgeRenderer {
             let resolved = false;
             
             ws.onopen = () => {
+                console.log(`✅ ${type} WebSocket connected successfully`);
                 this.websockets[type] = ws;
                 if (!resolved) {
                     resolved = true;
@@ -215,9 +305,11 @@ class IOSBridgeRenderer {
             };
             
             ws.onclose = () => {
+                console.log(`🔌 ${type} WebSocket closed`);
                 delete this.websockets[type];
                 
                 if (this.isConnected) {
+                    console.log(`🔄 Attempting to reconnect ${type} WebSocket in 3 seconds...`);
                     // Try to reconnect after a delay
                     setTimeout(() => {
                         if (this.isConnected) {
@@ -228,7 +320,7 @@ class IOSBridgeRenderer {
             };
             
             ws.onerror = (error) => {
-                console.error(`${type} WebSocket error:`, error);
+                console.error(`❌ ${type} WebSocket error:`, error);
                 if (!resolved) {
                     resolved = true;
                     reject(new Error(`${type} WebSocket connection failed`));
@@ -266,6 +358,7 @@ class IOSBridgeRenderer {
             if (type === 'video' && message.type === 'video_frame') {
                 this.handleVideoFrame(message);
             }
+            // Handle other message types as needed
         } catch (error) {
             console.error(`Error handling ${type} message:`, error);
         }
@@ -470,12 +563,60 @@ class IOSBridgeRenderer {
     }
     
     handleKeyDown(e) {
-        // Key handling implementation
+        // Only handle keyboard shortcuts when not in keyboard input mode or when input is not focused
+        const keyboardInput = document.getElementById('keyboard-input');
+        const isInputFocused = document.activeElement === keyboardInput;
+        
+        // If keyboard mode is active and input is focused, let normal typing work
+        if (this.keyboardMode && isInputFocused) {
+            return;
+        }
+        
+        // Handle global keyboard shortcuts
+        switch (e.key) {
+            case 'F1':
+                e.preventDefault();
+                this.handleDeviceAction('home');
+                break;
+            case 'F2':
+                e.preventDefault();
+                this.handleDeviceAction('screenshot');
+                break;
+            case 'F3':
+                e.preventDefault();
+                this.handleDeviceAction('info');
+                break;
+            case 'F4':
+                e.preventDefault();
+                this.handleDeviceAction('keyboard');
+                break;
+            case 'F5':
+                e.preventDefault();
+                this.handleDeviceAction('lock');
+                break;
+            case 'F6':
+                e.preventDefault();
+                this.handleDeviceAction('record');
+                break;
+            case 'F7':
+                e.preventDefault();
+                this.handleDeviceAction('stop-record');
+                break;
+        }
     }
     
     sendDeviceAction(type, data) {
+        console.log(`🔍 Attempting to send device action: ${type}`, data);
+        console.log(`🔍 Available WebSockets:`, Object.keys(this.websockets));
+        
         const controlWs = this.websockets.control;
+        console.log(`🔍 Control WebSocket:`, controlWs);
+        console.log(`🔍 Control WebSocket ReadyState:`, controlWs?.readyState);
+        console.log(`🔍 WebSocket.OPEN constant:`, WebSocket.OPEN);
+        
         if (!controlWs || controlWs.readyState !== WebSocket.OPEN) {
+            console.error(`❌ Control WebSocket not available. Type: ${type}, ReadyState: ${controlWs?.readyState}`);
+            console.error(`❌ WebSocket states: CONNECTING=${WebSocket.CONNECTING}, OPEN=${WebSocket.OPEN}, CLOSING=${WebSocket.CLOSING}, CLOSED=${WebSocket.CLOSED}`);
             return;
         }
         
@@ -488,10 +629,11 @@ class IOSBridgeRenderer {
             case 'swipe':
                 message = { 
                     t: 'swipe', 
-                    startX: data.startX, 
-                    startY: data.startY, 
-                    endX: data.endX, 
-                    endY: data.endY 
+                    start_x: data.startX, 
+                    start_y: data.startY, 
+                    end_x: data.endX, 
+                    end_y: data.endY,
+                    duration: data.duration || 0.3
                 };
                 break;
             case 'text':
@@ -500,11 +642,26 @@ class IOSBridgeRenderer {
             case 'button':
                 message = { t: 'button', button: data.button };
                 break;
+            case 'key':
+                message = { t: 'key', key: data.key };
+                if (data.duration !== undefined) {
+                    message.duration = data.duration;
+                }
+                break;
             default:
                 message = { t: type, ...data };
         }
         
-        controlWs.send(JSON.stringify(message));
+        const messageString = JSON.stringify(message);
+        console.log(`✅ Sending WebSocket message:`, message);
+        console.log(`✅ Message string:`, messageString);
+        
+        try {
+            controlWs.send(messageString);
+            console.log(`✅ WebSocket message sent successfully`);
+        } catch (error) {
+            console.error(`❌ Error sending WebSocket message:`, error);
+        }
     }
     
     handleDeviceAction(action) {
@@ -518,8 +675,17 @@ class IOSBridgeRenderer {
             case 'info':
                 this.showDeviceInfo();
                 break;
+            case 'keyboard':
+                this.toggleKeyboard();
+                break;
             case 'lock':
                 this.sendDeviceAction('button', { button: 'lock' });
+                break;
+            case 'record':
+                this.startRecording();
+                break;
+            case 'stop-record':
+                this.stopRecording();
                 break;
         }
     }
@@ -543,6 +709,59 @@ class IOSBridgeRenderer {
             setTimeout(() => {
                 canvas.style.filter = '';
             }, 200);
+        }
+        
+        // Get the session ID from config
+        const sessionId = this.config?.sessionId;
+        const serverUrl = this.config?.serverUrl;
+        
+        if (!sessionId || !serverUrl) {
+            console.error('Missing session ID or server URL for screenshot');
+            return;
+        }
+        
+        try {
+            // Call the screenshot API endpoint
+            const response = await fetch(`${serverUrl}/api/sessions/${sessionId}/screenshot/download`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                // Get the filename from Content-Disposition header or create one
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'screenshot.png';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename=(.+)/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1].replace(/"/g, ''); // Remove quotes
+                    }
+                }
+                
+                // Get the blob data
+                const blob = await response.blob();
+                
+                // Create a download link and trigger download
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                console.log(`Screenshot saved as ${filename}`);
+            } else {
+                console.error('Failed to take screenshot:', response.statusText);
+            }
+        } catch (error) {
+            console.error('Error taking screenshot:', error);
         }
     }
     
@@ -700,6 +919,393 @@ class IOSBridgeRenderer {
         setTimeout(() => {
             feedback.remove();
         }, 300);
+    }
+    
+    // Window control methods
+    async minimizeWindow() {
+        try {
+            await window.electronAPI.minimizeWindow();
+        } catch (error) {
+            console.error('Error minimizing window:', error);
+        }
+    }
+    
+    async closeWindow() {
+        try {
+            await window.electronAPI.quitApp();
+        } catch (error) {
+            console.error('Error closing window:', error);
+        }
+    }
+    
+    toggleQualityMenu() {
+        const qualityMenu = document.getElementById('quality-menu');
+        if (qualityMenu) {
+            qualityMenu.classList.toggle('show');
+        }
+    }
+    
+    // Keyboard functionality methods
+    toggleKeyboard() {
+        this.keyboardMode = !this.keyboardMode;
+        const keyboardSection = document.getElementById('keyboard-section');
+        const keyboardBtn = document.getElementById('keyboard-btn');
+        const keyboardInput = document.getElementById('keyboard-input');
+        
+        if (this.keyboardMode) {
+            keyboardSection.style.display = 'block';
+            keyboardBtn.classList.add('keyboard-active');
+            keyboardBtn.title = 'Hide Keyboard (F4)';
+            // Focus the input field
+            setTimeout(() => {
+                keyboardInput?.focus();
+            }, 100);
+        } else {
+            keyboardSection.style.display = 'none';
+            keyboardBtn.classList.remove('keyboard-active');
+            keyboardBtn.title = 'Toggle Keyboard (F4)';
+        }
+    }
+    
+    sendKeyboardText() {
+        const keyboardInput = document.getElementById('keyboard-input');
+        const text = keyboardInput?.value.trim();
+        
+        if (!text) return;
+        
+        console.log(`📝 Sending keyboard text: "${text}"`);
+        
+        // Send text via control WebSocket
+        this.sendDeviceAction('text', { text: text });
+        
+        // Clear the input
+        if (keyboardInput) {
+            keyboardInput.value = '';
+        }
+        
+        // Show feedback in footer
+        this.showTemporaryMessage(`Text sent: "${text}"`);
+    }
+    
+    clearKeyboardText() {
+        const keyboardInput = document.getElementById('keyboard-input');
+        if (keyboardInput) {
+            keyboardInput.value = '';
+            keyboardInput.focus();
+        }
+    }
+    
+    showTemporaryMessage(message) {
+        const keyboardHint = document.querySelector('.keyboard-hint');
+        if (keyboardHint) {
+            const originalText = keyboardHint.textContent;
+            keyboardHint.textContent = message;
+            keyboardHint.style.color = '#007AFF';
+            
+            setTimeout(() => {
+                keyboardHint.textContent = originalText;
+                keyboardHint.style.color = '#888';
+            }, 2000);
+        }
+    }
+    
+    // Real-time keyboard functionality
+    toggleRealtimeMode(enabled) {
+        this.realtimeMode = enabled;
+        const keyboardHint = document.getElementById('keyboard-hint');
+        const keyboardInputRow = document.querySelector('.keyboard-input-row');
+        const sendBtn = document.getElementById('send-text-btn');
+        const keyboardInput = document.getElementById('keyboard-input');
+        
+        if (enabled) {
+            keyboardHint.textContent = '⚡ Real-time mode: Each keystroke is sent immediately to the device';
+            keyboardHint.classList.add('realtime-active');
+            keyboardInputRow.classList.add('realtime-mode');
+            sendBtn.style.display = 'none';
+            keyboardInput.placeholder = 'Type directly - each key press goes to device...';
+        } else {
+            keyboardHint.textContent = '💡 Type directly on your keyboard when this panel is open. Press Enter to send text.';
+            keyboardHint.classList.remove('realtime-active');
+            keyboardInputRow.classList.remove('realtime-mode');
+            sendBtn.style.display = 'block';
+            keyboardInput.placeholder = 'Type text to send to device...';
+        }
+    }
+    
+    handleRealtimeKeyPress(e) {
+        // Prevent the default browser behavior for most keys
+        const allowedKeys = ['Tab', 'Escape', 'F1', 'F2', 'F3', 'F4'];
+        if (!allowedKeys.includes(e.key)) {
+            e.preventDefault();
+        }
+        
+        // Map JavaScript key events to iOS key codes
+        const keyCode = this.mapKeyToIOSCode(e.key);
+        
+        if (keyCode) {
+            // Send individual key press to device
+            console.log(`Sending key: ${keyCode} for input: ${e.key}`);
+            this.sendDeviceAction('key', { key: keyCode });
+            
+            // Show visual feedback
+            this.showRealtimeKeyFeedback(e.key);
+        } else {
+            console.log(`No mapping found for key: ${e.key}`);
+        }
+    }
+    
+    mapKeyToIOSCode(key) {
+        // iOS Key codes for idb ui key command
+        // These are based on iOS/UIKit key codes and HID usage codes
+        const keyMappings = {
+            // Letters - using HID usage codes
+            'a': '4', 'A': '4',
+            'b': '5', 'B': '5', 
+            'c': '6', 'C': '6',
+            'd': '7', 'D': '7',
+            'e': '8', 'E': '8',
+            'f': '9', 'F': '9',
+            'g': '10', 'G': '10',
+            'h': '11', 'H': '11',
+            'i': '12', 'I': '12',
+            'j': '13', 'J': '13',
+            'k': '14', 'K': '14',
+            'l': '15', 'L': '15',
+            'm': '16', 'M': '16',
+            'n': '17', 'N': '17',
+            'o': '18', 'O': '18',
+            'p': '19', 'P': '19',
+            'q': '20', 'Q': '20',
+            'r': '21', 'R': '21',
+            's': '22', 'S': '22',
+            't': '23', 'T': '23',
+            'u': '24', 'U': '24',
+            'v': '25', 'V': '25',
+            'w': '26', 'W': '26',
+            'x': '27', 'X': '27',
+            'y': '28', 'Y': '28',
+            'z': '29', 'Z': '29',
+            
+            // Numbers - HID usage codes
+            '1': '30', '2': '31', '3': '32', '4': '33', '5': '34',
+            '6': '35', '7': '36', '8': '37', '9': '38', '0': '39',
+            
+            // Special keys
+            'Enter': '40',      // Return
+            'Escape': '41',     // Escape
+            'Backspace': '42',  // Backspace
+            'Tab': '43',        // Tab
+            ' ': '44',          // Space
+            
+            // Punctuation
+            '-': '45',          // Minus/Hyphen
+            '=': '46',          // Equal
+            '[': '47',          // Left bracket
+            ']': '48',          // Right bracket
+            '\\': '49',         // Backslash
+            ';': '51',          // Semicolon
+            "'": '52',          // Apostrophe
+            '`': '53',          // Grave accent
+            ',': '54',          // Comma
+            '.': '55',          // Period
+            '/': '56',          // Slash
+            
+            // Arrow keys
+            'ArrowRight': '79', // Right arrow
+            'ArrowLeft': '80',  // Left arrow
+            'ArrowDown': '81',  // Down arrow
+            'ArrowUp': '82',    // Up arrow
+            
+            // Delete key
+            'Delete': '76'      // Delete forward
+        };
+        
+        // Try direct mapping first
+        if (keyMappings[key]) {
+            return keyMappings[key];
+        }
+        
+        // No fallback - only use mapped keys
+        return null;
+    }
+    
+    showRealtimeKeyFeedback(key) {
+        const keyboardHint = document.getElementById('keyboard-hint');
+        if (keyboardHint) {
+            const displayKey = key === ' ' ? 'SPACE' : key === 'Enter' ? 'RETURN' : key;
+            keyboardHint.textContent = `⚡ Sent: ${displayKey}`;
+            keyboardHint.style.color = '#00ff00';
+            
+            setTimeout(() => {
+                keyboardHint.textContent = '⚡ Real-time mode: Each keystroke is sent immediately to the device';
+                keyboardHint.style.color = '#007AFF';
+            }, 500);
+        }
+    }
+    
+    // Swipe gesture functionality
+    toggleSwipeMenu() {
+        const swipeMenu = document.getElementById('swipe-menu');
+        if (swipeMenu) {
+            swipeMenu.classList.toggle('show');
+        }
+    }
+    
+    performSwipeGesture(direction) {
+        // Close the menu
+        const swipeMenu = document.getElementById('swipe-menu');
+        if (swipeMenu) {
+            swipeMenu.classList.remove('show');
+        }
+        
+        // Define swipe coordinates based on device dimensions
+        const centerX = Math.round(this.deviceDimensions.width / 2);
+        const centerY = Math.round(this.deviceDimensions.height / 2);
+        const swipeDistance = Math.round(Math.min(this.deviceDimensions.width, this.deviceDimensions.height) * 0.3);
+        
+        let startX, startY, endX, endY;
+        
+        switch (direction) {
+            case 'up':
+                startX = centerX;
+                startY = centerY + swipeDistance;
+                endX = centerX;
+                endY = centerY - swipeDistance;
+                break;
+            case 'down':
+                startX = centerX;
+                startY = centerY - swipeDistance;
+                endX = centerX;
+                endY = centerY + swipeDistance;
+                break;
+            case 'left':
+                startX = centerX + swipeDistance;
+                startY = centerY;
+                endX = centerX - swipeDistance;
+                endY = centerY;
+                break;
+            case 'right':
+                startX = centerX - swipeDistance;
+                startY = centerY;
+                endX = centerX + swipeDistance;
+                endY = centerY;
+                break;
+            default:
+                return;
+        }
+        
+        console.log(`Performing ${direction} swipe: (${startX}, ${startY}) -> (${endX}, ${endY})`);
+        this.sendDeviceAction('swipe', {
+            startX: startX,
+            startY: startY,
+            endX: endX,
+            endY: endY,
+            duration: 0.3
+        });
+    }
+    
+    // Video recording functionality
+    async startRecording() {
+        if (this.isRecording) {
+            return;
+        }
+        
+        try {
+            const sessionId = this.config?.sessionId;
+            const serverUrl = this.config?.serverUrl;
+            
+            if (!sessionId || !serverUrl) {
+                console.error('Missing session ID or server URL for recording');
+                return;
+            }
+            
+            // Call the recording start API
+            const response = await fetch(`${serverUrl}/api/sessions/${sessionId}/recording/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                this.isRecording = true;
+                this.updateRecordingUI(true);
+                console.log('Recording started successfully');
+            } else {
+                console.error('Failed to start recording:', response.statusText);
+            }
+        } catch (error) {
+            console.error('Error starting recording:', error);
+        }
+    }
+    
+    async stopRecording() {
+        if (!this.isRecording) {
+            return;
+        }
+        
+        try {
+            const sessionId = this.config?.sessionId;
+            const serverUrl = this.config?.serverUrl;
+            
+            if (!sessionId || !serverUrl) {
+                console.error('Missing session ID or server URL for recording');
+                return;
+            }
+            
+            // Call the recording stop API
+            const response = await fetch(`${serverUrl}/api/sessions/${sessionId}/recording/stop`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                // Get the recording file and trigger download
+                const blob = await response.blob();
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `ios-recording-${sessionId.substring(0, 8)}-${timestamp}.mp4`;
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                this.isRecording = false;
+                this.updateRecordingUI(false);
+                console.log(`Recording saved as ${filename}`);
+            } else {
+                console.error('Failed to stop recording:', response.statusText);
+            }
+        } catch (error) {
+            console.error('Error stopping recording:', error);
+        }
+    }
+    
+    updateRecordingUI(recording) {
+        const recordBtn = document.getElementById('record-btn');
+        const stopRecordBtn = document.getElementById('stop-record-btn');
+        
+        if (recording) {
+            recordBtn.style.display = 'none';
+            recordBtn.classList.add('recording');
+            stopRecordBtn.style.display = 'flex';
+            stopRecordBtn.classList.add('recording');
+        } else {
+            recordBtn.style.display = 'flex';
+            recordBtn.classList.remove('recording');
+            stopRecordBtn.style.display = 'none';
+            stopRecordBtn.classList.remove('recording');
+        }
     }
 }
 
