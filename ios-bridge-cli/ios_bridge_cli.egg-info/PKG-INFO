@@ -1,13 +1,14 @@
 Metadata-Version: 2.4
 Name: ios-bridge-cli
 Version: 1.0.0
-Summary: Desktop streaming client for iOS Bridge simulator sessions
+Summary: Desktop streaming client for iOS Bridge simulator sessions with Electron app integration
 Home-page: https://github.com/your-org/ios-bridge-cli
 Author: iOS Bridge Team
 Author-email: iOS Bridge Team <support@iosbridge.dev>
 License: MIT
 Project-URL: Homepage, https://github.com/your-org/ios-bridge-cli
 Project-URL: Bug Tracker, https://github.com/your-org/ios-bridge-cli/issues
+Keywords: ios,simulator,bridge,streaming,electron,desktop,mobile,testing
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
@@ -19,6 +20,9 @@ Classifier: Programming Language :: Python :: 3.11
 Classifier: Operating System :: MacOS :: MacOS X
 Classifier: Operating System :: POSIX :: Linux
 Classifier: Operating System :: Microsoft :: Windows
+Classifier: Topic :: Software Development :: Testing
+Classifier: Topic :: System :: Emulators
+Classifier: Topic :: Utilities
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
@@ -28,6 +32,15 @@ Requires-Dist: websockets>=10.0
 Requires-Dist: pillow>=8.0.0
 Requires-Dist: psutil>=5.8.0
 Requires-Dist: aiohttp>=3.8.0
+Requires-Dist: packaging>=21.0
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.18.0; extra == "dev"
+Requires-Dist: black>=22.0; extra == "dev"
+Requires-Dist: flake8>=4.0; extra == "dev"
+Requires-Dist: mypy>=0.900; extra == "dev"
+Requires-Dist: build>=0.8.0; extra == "dev"
+Requires-Dist: twine>=4.0.0; extra == "dev"
 Dynamic: author
 Dynamic: home-page
 Dynamic: license-file

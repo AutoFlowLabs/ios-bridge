@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#007AFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#005BBB;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="phoneGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#F5F5F7;stop-opacity:0.9" />
+    </linearGradient>
+    <linearGradient id="screenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#000000;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1C1C1E;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGradient)" stroke="#0056D2" stroke-width="4"/>
+  
+  <!-- iPhone outline -->
+  <rect x="180" y="120" width="152" height="272" rx="28" ry="28" 
+        fill="url(#phoneGradient)" stroke="#D1D1D6" stroke-width="2"/>
+  
+  <!-- iPhone screen -->
+  <rect x="192" y="150" width="128" height="212" rx="18" ry="18" 
+        fill="url(#screenGradient)"/>
+  
+  <!-- Home indicator -->
+  <rect x="234" y="372" width="44" height="4" rx="2" ry="2" 
+        fill="#FFFFFF" opacity="0.8"/>
+  
+  <!-- Screen content - connection/bridge symbol -->
+  <g transform="translate(256, 256)">
+    <!-- Connection nodes -->
+    <circle cx="-30" cy="-20" r="8" fill="#00D4AA"/>
+    <circle cx="30" cy="-20" r="8" fill="#00D4AA"/>
+    <circle cx="-30" cy="20" r="8" fill="#FF9F0A"/>
+    <circle cx="30" cy="20" r="8" fill="#FF9F0A"/>
+    
+    <!-- Connection lines -->
+    <line x1="-22" y1="-20" x2="22" y2="-20" stroke="#00D4AA" stroke-width="3" opacity="0.8"/>
+    <line x1="-22" y1="20" x2="22" y2="20" stroke="#FF9F0A" stroke-width="3" opacity="0.8"/>
+    <line x1="-30" y1="-12" x2="-30" y2="12" stroke="#FFFFFF" stroke-width="3" opacity="0.6"/>
+    <line x1="30" y1="-12" x2="30" y2="12" stroke="#FFFFFF" stroke-width="3" opacity="0.6"/>
+    
+    <!-- Bridge symbol -->
+    <path d="M -40 0 Q 0 -25 40 0" stroke="#FFFFFF" stroke-width="2" fill="none" opacity="0.7"/>
+  </g>
+  
+  <!-- iOS Bridge text (simplified) -->
+  <text x="256" y="450" text-anchor="middle" font-family="Arial, sans-serif" 
+        font-size="24" font-weight="bold" fill="#FFFFFF" opacity="0.9">iOS Bridge</text>
+</svg>

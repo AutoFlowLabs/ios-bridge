@@ -1,0 +1,362 @@
+name: Build and Release iOS Bridge CLI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build-python:
+    name: Build Python Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      
+      - name: Build Python package
+        run: |
+          cd ios-bridge-cli
+          python -m build
+      
+      - name: Upload Python artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-package
+          path: ios-bridge-cli/dist/*
+
+  build-electron-macos:
+    name: Build Electron App (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ios-bridge-cli/ios_bridge_cli/electron_app/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd ios-bridge-cli/ios_bridge_cli/electron_app
+          npm ci
+      
+      - name: Build Electron app
+        run: |
+          cd ios-bridge-cli/ios_bridge_cli/electron_app
+          npm run build-mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: electron-macos
+          path: ios-bridge-cli/ios_bridge_cli/electron_app/dist/*
+
+  build-electron-windows:
+    name: Build Electron App (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ios-bridge-cli/ios_bridge_cli/electron_app/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd ios-bridge-cli/ios_bridge_cli/electron_app
+          npm ci
+      
+      - name: Build Electron app
+        run: |
+          cd ios-bridge-cli/ios_bridge_cli/electron_app
+          npm run build-win
+      
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: electron-windows
+          path: ios-bridge-cli/ios_bridge_cli/electron_app/dist/*
+
+  build-electron-linux:
+    name: Build Electron App (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ios-bridge-cli/ios_bridge_cli/electron_app/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd ios-bridge-cli/ios_bridge_cli/electron_app
+          npm ci
+      
+      - name: Build Electron app
+        run: |
+          cd ios-bridge-cli/ios_bridge_cli/electron_app
+          npm run build-linux
+      
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: electron-linux
+          path: ios-bridge-cli/ios_bridge_cli/electron_app/dist/*
+
+  create-release:
+    name: Create Release
+    needs: [build-python, build-electron-macos, build-electron-windows, build-electron-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Create release directory structure
+        run: |
+          mkdir -p release/{macos,windows,linux}
+          mkdir -p release/python
+      
+      - name: Organize release files
+        run: |
+          # Copy Python package
+          cp python-package/* release/python/
+          
+          # Copy Electron apps
+          cp -r electron-macos/* release/macos/ 2>/dev/null || true
+          cp -r electron-windows/* release/windows/ 2>/dev/null || true
+          cp -r electron-linux/* release/linux/ 2>/dev/null || true
+      
+      - name: Create installer scripts
+        run: |
+          # macOS installer
+          cat > release/macos/install.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          echo "🍎 Installing iOS Bridge CLI for macOS..."
+          
+          # Install Python package
+          if command -v pip3 &> /dev/null; then
+              pip3 install --upgrade ../python/*.whl
+          elif command -v pip &> /dev/null; then
+              pip install --upgrade ../python/*.whl
+          else
+              echo "❌ pip not found. Please install Python 3.8+"
+              exit 1
+          fi
+          
+          # Install Electron app
+          if [ -d "*.app" ]; then
+              echo "📱 Installing Electron app..."
+              sudo cp -R *.app /Applications/
+              echo "✅ iOS Bridge installed successfully!"
+          else
+              echo "⚠️ Electron app not found, CLI-only installation complete"
+          fi
+          
+          echo "Run 'ios-bridge --help' to get started"
+          EOF
+          chmod +x release/macos/install.sh
+          
+          # Windows installer
+          cat > release/windows/install.bat << 'EOF'
+          @echo off
+          echo 🪟 Installing iOS Bridge CLI for Windows...
+          
+          pip install --upgrade ../python/*.whl
+          if errorlevel 1 (
+              echo ❌ Failed to install Python package
+              pause
+              exit /b 1
+          )
+          
+          echo ✅ iOS Bridge CLI installed successfully!
+          echo Run the .exe file to launch the desktop app
+          echo Or run 'ios-bridge --help' for CLI usage
+          pause
+          EOF
+          
+          # Linux installer
+          cat > release/linux/install.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          echo "🐧 Installing iOS Bridge CLI for Linux..."
+          
+          # Install Python package
+          if command -v pip3 &> /dev/null; then
+              pip3 install --upgrade ../python/*.whl
+          elif command -v pip &> /dev/null; then
+              pip install --upgrade ../python/*.whl
+          else
+              echo "❌ pip not found. Please install Python 3.8+"
+              exit 1
+          fi
+          
+          # Make AppImage executable
+          if [ -f *.AppImage ]; then
+              chmod +x *.AppImage
+              echo "📱 Electron app ready: ./$(ls *.AppImage)"
+          fi
+          
+          echo "✅ iOS Bridge CLI installed successfully!"
+          echo "Run 'ios-bridge --help' to get started"
+          EOF
+          chmod +x release/linux/install.sh
+      
+      - name: Create README files
+        run: |
+          # Get version from tag or input
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [ "$VERSION" = "$GITHUB_REF" ]; then
+              VERSION=${{ github.event.inputs.version }}
+          fi
+          
+          # Main README
+          cat > release/README.md << EOF
+          # iOS Bridge CLI $VERSION
+          
+          Cross-platform desktop client for iOS Bridge simulator sessions with Electron app integration.
+          
+          ## Quick Install
+          
+          ### macOS
+          1. Download the macOS package
+          2. Run: \`chmod +x install.sh && ./install.sh\`
+          
+          ### Windows
+          1. Download the Windows package
+          2. Run: \`install.bat\`
+          
+          ### Linux
+          1. Download the Linux package
+          2. Run: \`chmod +x install.sh && ./install.sh\`
+          
+          ## Manual Install
+          
+          1. Install Python 3.8+
+          2. Install CLI: \`pip install ios-bridge-cli-*.whl\`
+          3. Launch desktop app from the platform folder
+          
+          ## Usage
+          
+          \`\`\`bash
+          # CLI usage
+          ios-bridge --help
+          ios-bridge connect ws://your-server:8000
+          
+          # Desktop app
+          # Launch the installed app or run the executable
+          \`\`\`
+          
+          ## Support
+          
+          - GitHub: https://github.com/your-org/ios-bridge
+          - Issues: https://github.com/your-org/ios-bridge/issues
+          EOF
+          
+          # Platform-specific READMEs
+          for platform in macos windows linux; do
+              cp release/README.md release/$platform/
+          done
+      
+      - name: Generate checksums
+        run: |
+          cd release
+          find . -type f \( -name "*.whl" -o -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec sha256sum {} \; > checksums.txt
+      
+      - name: Create release archives
+        run: |
+          cd release
+          tar -czf ios-bridge-cli-macos.tar.gz macos/
+          zip -r ios-bridge-cli-windows.zip windows/
+          tar -czf ios-bridge-cli-linux.tar.gz linux/
+          tar -czf ios-bridge-cli-python.tar.gz python/
+      
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: iOS Bridge CLI ${{ github.ref }}
+          draft: false
+          prerelease: false
+          body: |
+            ## iOS Bridge CLI Release
+            
+            Cross-platform desktop client for iOS Bridge simulator sessions.
+            
+            ### Downloads
+            - **macOS**: ios-bridge-cli-macos.tar.gz
+            - **Windows**: ios-bridge-cli-windows.zip  
+            - **Linux**: ios-bridge-cli-linux.tar.gz
+            - **Python Package**: ios-bridge-cli-python.tar.gz
+            
+            ### Installation
+            1. Download the package for your platform
+            2. Extract and run the installer script
+            3. Follow the platform-specific README
+            
+            ### Checksums
+            See checksums.txt for file verification.
+      
+      - name: Upload Release Assets
+        run: |
+          # Upload platform packages
+          gh release upload ${{ github.ref }} release/ios-bridge-cli-macos.tar.gz
+          gh release upload ${{ github.ref }} release/ios-bridge-cli-windows.zip
+          gh release upload ${{ github.ref }} release/ios-bridge-cli-linux.tar.gz
+          gh release upload ${{ github.ref }} release/ios-bridge-cli-python.tar.gz
+          gh release upload ${{ github.ref }} release/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build-python]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Python artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: python-package
+          path: dist/
+      
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: dist/

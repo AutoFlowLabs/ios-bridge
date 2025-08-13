@@ -1,7 +1,27 @@
 include README.md
 include LICENSE
-recursive-include ios_bridge_cli/electron_app *.json *.js *.html *.css
+include INSTALL.md
+include USAGE.md
+include PROJECT_SUMMARY.md
+include COMPLETE_TEST_GUIDE.md
+include TESTING_GUIDE.md
+include pyproject.toml
+include requirements.txt
+include build_and_package.py
+include generate_icons.py
+
+# Include Electron app
+recursive-include ios_bridge_cli/electron_app *.json *.js *.html *.css *.png *.ico *.icns *.svg *.plist
 recursive-include ios_bridge_cli/electron_app/src *
 recursive-include ios_bridge_cli/electron_app/assets *
+
+# Exclude development and build files
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+recursive-exclude * .git*
+recursive-exclude ios_bridge_cli/electron_app/node_modules *
+recursive-exclude ios_bridge_cli/electron_app/dist *
+prune build
+prune dist
+prune *.egg-info

@@ -5,12 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ios-bridge-cli"
 version = "1.0.0"
-description = "Desktop streaming client for iOS Bridge simulator sessions"
+description = "Desktop streaming client for iOS Bridge simulator sessions with Electron app integration"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
     {name = "iOS Bridge Team", email = "support@iosbridge.dev"},
 ]
+keywords = ["ios", "simulator", "bridge", "streaming", "electron", "desktop", "mobile", "testing"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -23,6 +24,9 @@ classifiers = [
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Emulators",
+    "Topic :: Utilities",
 ]
 requires-python = ">=3.8"
 dependencies = [
@@ -32,6 +36,18 @@ dependencies = [
     "pillow>=8.0.0",
     "psutil>=5.8.0",
     "aiohttp>=3.8.0",
+    "packaging>=21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-asyncio>=0.18.0",
+    "black>=22.0",
+    "flake8>=4.0",
+    "mypy>=0.900",
+    "build>=0.8.0",
+    "twine>=4.0.0",
 ]
 
 [project.urls]
