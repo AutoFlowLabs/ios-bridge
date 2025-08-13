@@ -17,6 +17,16 @@ class VideoWebSocket:
         await websocket.accept()
         logger.info("Video WebSocket connected")
         
+        await self._handle_video_streaming(websocket)
+    
+    async def handle_connection_managed(self, websocket: WebSocket):
+        """Handle video WebSocket connection with managed resources (no websocket.accept())"""
+        logger.info("Video WebSocket connected (managed)")
+        
+        await self._handle_video_streaming(websocket)
+    
+    async def _handle_video_streaming(self, websocket: WebSocket):
+        """Core video streaming logic"""
         self.video_service.add_client(websocket)
         
         try:

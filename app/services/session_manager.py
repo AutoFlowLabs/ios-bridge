@@ -388,13 +388,13 @@ class SessionManager:
         
         session = self.active_sessions[session_id]
         
-        # Get device dimensions (logical points, scaled for desktop UI)
-        device_width, device_height = 390, 844  # Default dimensions
+        # Get device dimensions (logical points)
+        device_width, device_height = 390, 844  # Default logical point dimensions
         stream_width, stream_height = None, None  # Actual pixel dimensions of the stream
         try:
             from app.services.device_service import DeviceService
             device_service = DeviceService(session.udid)
-            # Use synchronous version to avoid asyncio issues (returns scaled point dims)
+            # Use synchronous version to avoid asyncio issues (returns logical point dims, unscaled)
             device_width, device_height = self._get_device_dimensions_sync(device_service.udid)
             # Also fetch the raw pixel stream dimensions for accurate rendering in Electron
             stream_dims = self._get_stream_dimensions_sync(device_service.udid)
@@ -415,7 +415,7 @@ class SessionManager:
             'uptime': time.time() - session.created_at,
             'pid': session.pid,
             'state': session.device.state,
-            # Desktop-scaled logical dimensions (used for coordinate mapping/UI)
+            # Logical point dimensions (used for coordinate mapping/UI). These are unscaled points.
             'device_width': device_width,
             'device_height': device_height,
             # Raw stream pixel dimensions for accurate window sizing
@@ -432,7 +432,7 @@ class SessionManager:
         }
     
     def _get_device_dimensions_sync(self, udid: str) -> Tuple[int, int]:
-        """Get device dimensions synchronously - scaled for desktop display (logical points)."""
+        """Get device logical point dimensions synchronously (width_points, height_points)."""
         try:
             import subprocess
             import re
@@ -448,14 +448,8 @@ class SessionManager:
                 if screen_dims_match:
                     width_points = int(screen_dims_match.group(1))
                     height_points = int(screen_dims_match.group(2))
-                    
-                    # Scale down for desktop display (typically 0.6-0.8x looks good)
-                    desktop_scale = 0.75  # Adjust this value as needed
-                    desktop_width = int(width_points * desktop_scale)
-                    desktop_height = int(height_points * desktop_scale)
-                    
-                    logger.info(f"Device {udid} point dimensions: {width_points}x{height_points}, desktop scaled: {desktop_width}x{desktop_height}")
-                    return (desktop_width, desktop_height)
+                    logger.info(f"Device {udid} point dimensions: {width_points}x{height_points} (logical points)")
+                    return (width_points, height_points)
                 
                 # Fallback: try original regex patterns
                 width_points_match = re.search(r'width_points=(\d+)', result.stdout)
@@ -464,20 +458,14 @@ class SessionManager:
                 if width_points_match and height_points_match:
                     width_points = int(width_points_match.group(1))
                     height_points = int(height_points_match.group(1))
-                    
-                    # Scale down for desktop display
-                    desktop_scale = 0.75
-                    desktop_width = int(width_points * desktop_scale)
-                    desktop_height = int(height_points * desktop_scale)
-                    
-                    logger.info(f"Device {udid} fallback dimensions: {width_points}x{height_points}, desktop scaled: {desktop_width}x{desktop_height}")
-                    return (desktop_width, desktop_height)
+                    logger.info(f"Device {udid} fallback point dimensions: {width_points}x{height_points} (logical points)")
+                    return (width_points, height_points)
                 
         except Exception as e:
             logger.warning(f"Error getting device dimensions: {e}")
         
-        # Default dimensions for iPhone (scaled for desktop)
-        return (294, 633)  # 390*0.75, 844*0.75
+        # Default logical point dimensions for iPhone
+        return (390, 844)
 
     def _get_stream_dimensions_sync(self, udid: str) -> Optional[Tuple[int, int]]:
         """Get the raw stream pixel dimensions (width, height) via idb describe."""

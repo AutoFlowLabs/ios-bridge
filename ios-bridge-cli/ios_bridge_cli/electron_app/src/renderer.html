@@ -80,7 +80,14 @@
                     </svg>
                 </button>
                 
-                <button id="stop-record-btn" class="control-btn" data-action="stop-record" title="Stop Recording (F7)" style="display: none;">
+                <button id="stream-mode-btn" class="control-btn" data-action="toggle-stream" title="Toggle Stream Mode (F7)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm0 4H9v-2h10v2z"/>
+                    </svg>
+                    <span id="stream-mode-label">WebSocket</span>
+                </button>
+                
+                <button id="stop-record-btn" class="control-btn" data-action="stop-record" title="Stop Recording" style="display: none;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
                         <rect x="8" y="8" width="8" height="8" fill="currentColor"/>
@@ -126,6 +133,7 @@
                 <div class="device-shell">
                     <div class="device-screen">
                         <canvas id="video-canvas" class="video-canvas"></canvas>
+                        <video id="webrtc-video" class="webrtc-video" style="display: none;" autoplay playsinline muted></video>
                         <div id="touch-overlay" class="touch-overlay"></div>
                     </div>
                     <div class="device-notch" aria-hidden="true"></div>
