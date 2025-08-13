@@ -10,64 +10,60 @@ import av
 import numpy as np
 from PIL import Image
 from fractions import Fraction
-from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceCandidate
+from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceCandidate, RTCConfiguration
 
 from app.core.logging import logger
 from app.services.screenshot_service import ScreenshotService
 
-class SimpleVideoTrack(VideoStreamTrack):
-    """Stable video track with consistent frame timing to prevent flickering"""
+class FastVideoTrack(VideoStreamTrack):
+    """Fast video track optimized for low latency streaming"""
     
-    def __init__(self, service, target_fps=30):
+    def __init__(self, service, target_fps=60):
         super().__init__()
         self.service = service
         self.frame_count = 0
         self.target_fps = target_fps
         self.frame_interval = 1.0 / target_fps
         self.start_time = time.time()
-        self.last_frame = None
-        logger.info(f"🎬 VideoTrack initialized: {target_fps}fps, interval: {self.frame_interval:.3f}s")
+        self.last_frame_data = None
+        logger.info(f"🚀 FastVideoTrack initialized: {target_fps}fps")
     
     async def recv(self):
-        """Generate stable video frames with consistent timing"""
-        # Calculate target timestamp for this frame
+        """Generate fast video frames with consistent timing"""
+        # Calculate precise frame timing
         target_time = self.start_time + (self.frame_count * self.frame_interval)
         current_time = time.time()
         
-        # Wait until it's time for the next frame
+        # Wait for precise timing
         wait_time = target_time - current_time
         if wait_time > 0:
             await asyncio.sleep(wait_time)
         
-        # Try to get fresh frame
-        frame = await self.service.get_next_frame()
+        # Get frame from service
+        frame_data = await self.service.get_fast_frame()
         
-        # If no new frame available, reuse last frame to prevent flickering
-        if frame is None and self.last_frame is not None:
-            # Create new frame from last frame's data
-            frame_array = self.last_frame.to_ndarray(format='rgb24')
-            frame = av.VideoFrame.from_ndarray(frame_array, format='rgb24')
-            logger.debug(f"🔄 Reusing last frame for WebRTC stability (frame {self.frame_count})")
-        elif frame is None:
-            # Only create placeholder if we have no previous frame
+        if frame_data is not None:
+            self.last_frame_data = frame_data
+            frame = frame_data
+        elif self.last_frame_data is not None:
+            # Reuse last frame if no new data
+            frame = self.last_frame_data
+        else:
+            # Create minimal placeholder
             frame = av.VideoFrame.from_ndarray(
-                np.zeros((390, 844, 3), dtype=np.uint8),  # Fixed dimensions
+                np.zeros((200, 200, 3), dtype=np.uint8),
                 format='rgb24'
             )
-            logger.debug(f"🖼️  Created placeholder frame {self.frame_count}")
-        else:
-            # Store this frame's data for potential reuse
-            self.last_frame = frame
         
-        # Set consistent WebRTC timing
+        # Set WebRTC timing
         frame.pts = self.frame_count
         frame.time_base = Fraction(1, self.target_fps)
         
         self.frame_count += 1
         return frame
 
-class SimpleWebRTCService:
-    """Simple WebRTC service using optimized screenshots for proven reliability"""
+class FastWebRTCService:
+    """Fast WebRTC service optimized for continuous streaming with low latency"""
     
     def __init__(self, udid: Optional[str] = None):
         self.udid = udid
@@ -75,169 +71,165 @@ class SimpleWebRTCService:
         # WebRTC state
         self.peer_connections: Dict[str, RTCPeerConnection] = {}
         self.stream_active = False
-        self.video_queue = Queue(maxsize=2)  # Minimal buffer to prevent stale frames
+        self.frame_queue = Queue(maxsize=1)  # Single frame buffer for lowest latency
         
         # Stream processing
         self.frame_thread = None
         self.stream_lock = threading.Lock()
         
-        # Quality settings optimized for stability
-        self.quality_preset = "high"  # Use high quality by default
-        self.target_fps = 30  # Lower FPS for stability, reduces flickering
+        # Fast streaming settings
+        self.target_fps = 60
+        self.quality_preset = "medium"
         
+        logger.info(f"🚀 FastWebRTCService initialized for {udid}")
+    
     def set_udid(self, udid: str):
         """Set the UDID for this service instance"""
         self.udid = udid
-        logger.info(f"🎯 SimpleWebRTC UDID set to: {udid}")
+        logger.info(f"🎯 Fast WebRTC UDID set to: {udid}")
     
-    def start_video_stream(self, quality: str = "high", fps: int = 30) -> bool:
-        """Start optimized screenshot-based streaming for WebRTC"""
+    def start_video_stream(self, quality: str = "medium", fps: int = 60) -> bool:
+        """Start fast continuous streaming"""
         if not self.udid:
-            logger.error("❌ No UDID set for WebRTC streaming")
+            logger.error("❌ No UDID set for fast WebRTC streaming")
             return False
-            
+        
         with self.stream_lock:
             if self.stream_active:
-                logger.info(f"✅ WebRTC stream already active for {self.udid}")
+                logger.info(f"✅ Fast WebRTC stream already active for {self.udid}")
                 return True
             
-            self.quality_preset = quality
             self.target_fps = fps
+            self.quality_preset = quality
             
             try:
-                logger.info(f"🚀 Starting WebRTC stream for {self.udid} at {fps}fps, quality: {quality}")
+                logger.info(f"🚀 Starting fast WebRTC stream for {self.udid} at {fps}fps")
                 
                 self.stream_active = True
                 
-                # Start frame generation thread
+                # Start continuous frame generation
                 self.frame_thread = threading.Thread(
-                    target=self._generate_frames,
+                    target=self._generate_fast_frames,
                     daemon=True
                 )
                 self.frame_thread.start()
                 
-                logger.info(f"✅ WebRTC stream started for {self.udid}")
+                logger.info(f"✅ Fast WebRTC stream started for {self.udid}")
                 return True
-                    
+                
             except Exception as e:
-                logger.error(f"❌ Failed to start WebRTC stream for {self.udid}: {e}")
-                import traceback
-                logger.error(f"   Traceback: {traceback.format_exc()}")
+                logger.error(f"❌ Failed to start fast WebRTC stream for {self.udid}: {e}")
                 return False
     
-    def _generate_frames(self):
-        """Generate stable frames for WebRTC with consistent timing"""
-        logger.info(f"🎬 Starting stable WebRTC frame generation for {self.udid} @ {self.target_fps}fps...")
+    def _generate_fast_frames(self):
+        """Generate frames continuously for smooth streaming"""
+        logger.info(f"🎬 Starting fast frame generation for {self.udid} @ {self.target_fps}fps")
         
         try:
             screenshot_service = ScreenshotService(self.udid)
             
             frame_count = 0
-            last_log_time = time.time()
             frame_interval = 1.0 / self.target_fps
             next_frame_time = time.time()
+            last_log_time = time.time()
             
             while self.stream_active:
                 current_time = time.time()
                 
-                # Wait for precise frame timing
+                # Precise timing control
                 if current_time < next_frame_time:
                     sleep_time = next_frame_time - current_time
-                    if sleep_time > 0.001:  # Only sleep if worth it
+                    if sleep_time > 0.001:
                         time.sleep(sleep_time)
                     continue
                 
                 try:
-                    # Capture screenshot based on quality
-                    if self.quality_preset in ["ultra", "high"]:
+                    # Fast screenshot capture
+                    if self.quality_preset in ["high", "ultra"]:
                         screenshot_data = screenshot_service.capture_high_quality_screenshot()
                     else:
                         screenshot_data = screenshot_service.capture_ultra_fast_screenshot()
                     
                     if screenshot_data and "data" in screenshot_data:
-                        # Decode and process image
+                        # Quick image processing
                         image_bytes = base64.b64decode(screenshot_data["data"])
                         
                         with Image.open(io.BytesIO(image_bytes)) as img:
                             if img.mode != 'RGB':
                                 img = img.convert('RGB')
                             
-                            # Consistent resolution for stability
+                            # Optimize resolution for speed vs quality
                             if self.quality_preset == "ultra":
-                                target_size = (468, 1014)  # 2x device logical resolution
+                                target_size = (468, 1014)  # 2x logical
                             elif self.quality_preset == "high":
-                                target_size = (390, 844)   # 1.67x device logical resolution  
-                            else:
-                                target_size = (294, 639)   # Device logical resolution
+                                target_size = (390, 844)   # 1.67x logical
+                            elif self.quality_preset == "medium":
+                                target_size = (312, 675)   # 1.33x logical
+                            else:  # low
+                                target_size = (234, 507)   # 1x logical
                             
-                            # Resize with high quality
-                            img = img.resize(target_size, Image.Resampling.LANCZOS)
+                            # Fast resize
+                            img = img.resize(target_size, Image.Resampling.BILINEAR)  # Faster than LANCZOS
                             
-                            # Convert to numpy array
+                            # Convert to frame
                             img_array = np.array(img, dtype=np.uint8)
+                            av_frame = av.VideoFrame.from_ndarray(img_array, format='rgb24')
                             
-                            # Create AV frame
-                            rgb_frame = av.VideoFrame.from_ndarray(img_array, format='rgb24')
-                            
-                            # Manage queue for consistent flow
-                            while not self.video_queue.empty():
+                            # Replace frame in queue (always fresh frame)
+                            while not self.frame_queue.empty():
                                 try:
-                                    self.video_queue.get_nowait()  # Remove old frames
-                                except:
+                                    self.frame_queue.get_nowait()
+                                except Empty:
                                     break
                             
-                            # Add new frame
                             try:
-                                self.video_queue.put_nowait(rgb_frame)
+                                self.frame_queue.put_nowait(av_frame)
                                 frame_count += 1
                             except:
-                                logger.debug("Queue full, frame dropped")
+                                pass  # Queue management
                     
-                    # Set next frame time
+                    # Update timing
                     next_frame_time += frame_interval
                     
-                    # Prevent time drift
+                    # Prevent timing drift
                     if next_frame_time < current_time:
                         next_frame_time = current_time + frame_interval
                     
-                    # Periodic logging
+                    # Periodic status
                     if current_time - last_log_time >= 15.0:
                         actual_fps = frame_count / (current_time - last_log_time) if (current_time - last_log_time) > 0 else 0
-                        logger.info(f"📊 WebRTC {self.udid}: {frame_count} frames, {actual_fps:.1f}fps actual, queue: {self.video_queue.qsize()}")
+                        logger.info(f"📊 Fast WebRTC {self.udid}: {frame_count} frames, {actual_fps:.1f}fps, queue: {self.frame_queue.qsize()}")
                         last_log_time = current_time
                         frame_count = 0
-                        
+                
                 except Exception as e:
                     logger.debug(f"Frame generation error: {e}")
-                    next_frame_time += frame_interval  # Keep timing consistent even on errors
+                    next_frame_time += frame_interval
                     
         except Exception as e:
-            logger.error(f"WebRTC frame generation critical error for {self.udid}: {e}")
-            import traceback
-            logger.error(f"   Traceback: {traceback.format_exc()}")
+            logger.error(f"Fast frame generation error for {self.udid}: {e}")
         finally:
-            logger.info(f"🛑 WebRTC frame generation stopped for {self.udid}")
+            logger.info(f"🛑 Fast frame generation stopped for {self.udid}")
     
-    async def get_next_frame(self):
-        """Get next frame from video queue with timeout"""
+    async def get_fast_frame(self):
+        """Get next frame with minimal delay"""
         try:
-            # Shorter timeout to avoid frame staleness
-            frame = self.video_queue.get(timeout=0.05)
+            frame = self.frame_queue.get(timeout=0.02)  # Very short timeout
             return frame
         except Empty:
             return None
     
     def stop_video_stream(self):
         """Stop video streaming and cleanup"""
-        logger.info(f"🛑 Stopping WebRTC stream for {self.udid}")
+        logger.info(f"🛑 Stopping fast WebRTC stream for {self.udid}")
         
         with self.stream_lock:
             self.stream_active = False
             
             # Clear frame queue
-            while not self.video_queue.empty():
+            while not self.frame_queue.empty():
                 try:
-                    self.video_queue.get_nowait()
+                    self.frame_queue.get_nowait()
                 except Empty:
                     break
         
@@ -252,32 +244,34 @@ class SimpleWebRTCService:
                 logger.debug(f"Error closing connection {connection_id}: {e}")
     
     async def create_peer_connection(self) -> tuple[str, RTCPeerConnection]:
-        """Create new WebRTC peer connection"""
+        """Create new WebRTC peer connection optimized for speed"""
         if not self.stream_active:
             if not self.start_video_stream(self.quality_preset, self.target_fps):
-                raise Exception("Failed to start WebRTC stream")
+                raise Exception("Failed to start fast WebRTC stream")
         
         connection_id = str(uuid.uuid4())
-        pc = RTCPeerConnection()
         
-        # Add video track with stable FPS
-        video_track = SimpleVideoTrack(self, target_fps=self.target_fps)
+        # Simple WebRTC configuration for speed
+        config = RTCConfiguration(iceServers=[])
+        pc = RTCPeerConnection(configuration=config)
+        
+        # Add fast video track
+        video_track = FastVideoTrack(self, target_fps=self.target_fps)
         pc.addTrack(video_track)
-        logger.info(f"📹 Added video track with {self.target_fps}fps for {self.udid}")
         
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():  # noqa: F841
-            logger.info(f"🔗 WebRTC connection state for {self.udid}: {pc.connectionState}")
+            logger.info(f"🔗 Fast WebRTC connection state for {self.udid}: {pc.connectionState}")
             if pc.connectionState in ["failed", "closed"]:
                 self.remove_connection(connection_id)
         
         self.peer_connections[connection_id] = pc
-        logger.info(f"🤝 Created WebRTC peer connection: {connection_id} for {self.udid}")
+        logger.info(f"🤝 Created fast WebRTC peer connection: {connection_id} for {self.udid}")
         return connection_id, pc
     
     async def handle_offer(self, pc: RTCPeerConnection, offer_data: Dict) -> Dict:
         """Handle WebRTC offer"""
-        logger.info(f"📤 Handling WebRTC offer for {self.udid}")
+        logger.info(f"📤 Handling fast WebRTC offer for {self.udid}")
         
         await pc.setRemoteDescription(RTCSessionDescription(
             sdp=offer_data["sdp"],
@@ -287,7 +281,7 @@ class SimpleWebRTCService:
         answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
         
-        logger.info(f"📥 WebRTC answer created for {self.udid}")
+        logger.info(f"📥 Fast WebRTC answer created for {self.udid}")
         
         return {
             "type": "answer",
@@ -296,7 +290,7 @@ class SimpleWebRTCService:
     
     async def handle_ice_candidate(self, pc: RTCPeerConnection, candidate_data: Dict):
         """Handle ICE candidate"""
-        logger.debug(f"🧊 Handling ICE candidate for {self.udid}")
+        logger.debug(f"🧊 Handling ICE candidate for fast WebRTC {self.udid}")
         candidate_info = candidate_data.get("candidate")
         if candidate_info:
             candidate = RTCIceCandidate(
@@ -311,7 +305,7 @@ class SimpleWebRTCService:
         if connection_id in self.peer_connections:
             try:
                 del self.peer_connections[connection_id]
-                logger.info(f"🗑️  Removed WebRTC connection: {connection_id}")
+                logger.info(f"🗑️  Removed fast WebRTC connection: {connection_id}")
             except KeyError:
                 pass
         
@@ -333,11 +327,17 @@ class SimpleWebRTCService:
     
     def set_fps(self, fps: int) -> Dict:
         """Set target FPS"""
-        if fps < 10 or fps > 120:
-            return {"success": False, "error": "FPS must be between 10 and 120"}
+        if fps < 20 or fps > 120:
+            return {"success": False, "error": "FPS must be between 20 and 120"}
         
         old_fps = self.target_fps
         self.target_fps = fps
+        
+        # Restart if active
+        was_active = self.stream_active
+        if was_active:
+            self.stop_video_stream()
+            self.start_video_stream(self.quality_preset, fps)
         
         logger.info(f"📊 FPS changed from {old_fps} to {fps} for {self.udid}")
         return {"success": True, "fps": fps}
@@ -349,6 +349,7 @@ class SimpleWebRTCService:
             "connections": len(self.peer_connections),
             "quality": self.quality_preset,
             "fps": self.target_fps,
-            "queue_size": self.video_queue.qsize(),
-            "udid": self.udid
+            "queue_size": self.frame_queue.qsize(),
+            "udid": self.udid,
+            "type": "fast_screenshot_webrtc"
         }

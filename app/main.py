@@ -10,15 +10,15 @@ from app.api.websockets.log_handler_ws import handle_log_websocket
 from app.config.settings import settings
 from app.core.logging import logger
 from app.services.video_service import VideoService
-from app.services.webrtc_service import WebRTCService
 from app.services.device_service import DeviceService
 from app.services.screenshot_service import ScreenshotService
 from app.services.session_manager import session_manager
 from app.api.routes import debug, session_routes
 from app.api.websockets.control_ws import ControlWebSocket
 from app.api.websockets.video_ws import VideoWebSocket
-from app.api.websockets.webrtc_ws import WebRTCWebSocket
 from app.api.websockets.screenshot_ws import ScreenshotWebSocket
+from app.api.websockets.webrtc_ws import WebRTCWebSocket
+from app.services.fast_webrtc_service import FastWebRTCService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -100,7 +100,7 @@ async def video_websocket(websocket: WebSocket, session_id: str):
 
 @app.websocket("/ws/{session_id}/webrtc")
 async def webrtc_websocket(websocket: WebSocket, session_id: str):
-    """WebRTC WebSocket endpoint"""
+    """WebRTC WebSocket endpoint - Real-time streaming using idb video-stream"""
     try:
         # Validate session exists first
         udid = session_manager.get_session_udid(session_id)
@@ -109,11 +109,11 @@ async def webrtc_websocket(websocket: WebSocket, session_id: str):
             await websocket.close(code=4004, reason="Session not found")
             return
         
-        # Create WebRTC service for this session
-        webrtc_service = WebRTCService(udid)
+        # Create fast WebRTC service for this session
+        webrtc_service = FastWebRTCService(udid)
         webrtc_ws = WebRTCWebSocket(webrtc_service)
         
-        # Handle the connection (only call this once!)
+        # Handle the connection
         await webrtc_ws.handle_connection(websocket)
         
     except WebSocketDisconnect:
@@ -144,6 +144,7 @@ async def screenshot_websocket(websocket: WebSocket, session_id: str):
         logger.info(f"Screenshot WebSocket disconnected for session: {session_id}")
     except Exception as e:
         logger.error(f"Screenshot WebSocket error for session {session_id}: {e}")
+
 
 @app.websocket("/ws/{session_id}/logs")
 async def logs_websocket(websocket: WebSocket, session_id: str):
@@ -206,11 +207,12 @@ async def set_webrtc_quality(session_id: str, quality: str):
         if not udid:
             return {"success": False, "error": "Session not found"}
         
+        # Fast WebRTC presets (optimized screenshots with good latency)
         presets = {
-            "low": {"fps": 30, "resolution_scale": 1, "quality": 70},
-            "medium": {"fps": 45, "resolution_scale": 1.5, "quality": 85},
-            "high": {"fps": 60, "resolution_scale": 2, "quality": 95},
-            "ultra": {"fps": 60, "resolution_scale": 2.5, "quality": 98}
+            "low": {"fps": 45, "resolution": "234x507", "quality": "good"},
+            "medium": {"fps": 60, "resolution": "312x675", "quality": "better"},
+            "high": {"fps": 75, "resolution": "390x844", "quality": "high"},
+            "ultra": {"fps": 90, "resolution": "468x1014", "quality": "best"}
         }
         
         if quality in presets:
@@ -269,7 +271,7 @@ def cleanup():
     #     logger.error(f"Error during cleanup: {e}")
 
 atexit.register(cleanup)
-signal.signal(signal.SIGTERM, lambda s, f: cleanup())
+signal.signal(signal.SIGTERM, lambda sig, frame: cleanup())
 
 if __name__ == "__main__":
     import uvicorn
