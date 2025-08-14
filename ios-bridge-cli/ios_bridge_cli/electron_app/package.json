@@ -101,7 +101,11 @@
           ]
         }
       ],
-      "category": "Development"
+      "category": "Development",
+      "maintainer": "iOS Bridge Team <support@iosbridge.dev>",
+      "vendor": "iOS Bridge Team",
+      "synopsis": "Desktop streaming client for iOS Bridge simulator sessions",
+      "description": "Cross-platform desktop client for iOS Bridge that provides real-time streaming and control of iOS simulators with WebSocket and WebRTC support."
     },
     "nsis": {
       "oneClick": false,
@@ -117,6 +121,14 @@
   "dependencies": {
     "ws": "^8.13.0"
   },
-  "author": "iOS Bridge Team",
+  "author": {
+    "name": "iOS Bridge Team",
+    "email": "support@iosbridge.dev"
+  },
+  "homepage": "https://github.com/AutoFlowLabs/ios-bridge",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AutoFlowLabs/ios-bridge.git"
+  },
   "license": "MIT"
 }
