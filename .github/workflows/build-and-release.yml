@@ -34,7 +34,7 @@ jobs:
           python -m build
       
       - name: Upload Python artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: python-package
           path: ios-bridge-cli/dist/*
@@ -65,7 +65,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: electron-macos
           path: ios-bridge-cli/ios_bridge_cli/electron_app/dist/*
@@ -94,7 +94,7 @@ jobs:
           npm run build-win
       
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: electron-windows
           path: ios-bridge-cli/ios_bridge_cli/electron_app/dist/*
@@ -123,7 +123,7 @@ jobs:
           npm run build-linux
       
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: electron-linux
           path: ios-bridge-cli/ios_bridge_cli/electron_app/dist/*
@@ -141,7 +141,7 @@ jobs:
           python-version: '3.11'
       
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       
       - name: Create release directory structure
         run: |
@@ -151,32 +151,52 @@ jobs:
       - name: Package Electron apps for auto-download
         run: |
           # Copy Python package
-          cp python-package/* release/python/
+          cp python-package/* release/python/ || echo "No Python packages found"
+          
+          # Debug: List all artifacts
+          echo "=== Available artifacts ==="
+          ls -la .
           
           # Package Electron apps with exact names expected by CLI auto-download
-          cd electron-macos 2>/dev/null && {
-            if [ -d "mac-arm64" ]; then
+          if [ -d "electron-macos" ]; then
+            echo "=== Processing macOS artifacts ==="
+            cd electron-macos
+            ls -la .
+            if [ -d "mac-arm64" ] && [ -d "mac-arm64/iOS Bridge.app" ]; then
               zip -r ../release/ios-bridge-desktop-mac-arm64.zip "mac-arm64/iOS Bridge.app"
+              echo "Created macOS ARM64 package"
             fi
-            if [ -d "mac-x64" ]; then
-              zip -r ../release/ios-bridge-desktop-mac-x64.zip "mac-x64/iOS Bridge.app"  
+            if [ -d "mac-x64" ] && [ -d "mac-x64/iOS Bridge.app" ]; then
+              zip -r ../release/ios-bridge-desktop-mac-x64.zip "mac-x64/iOS Bridge.app"
+              echo "Created macOS x64 package"  
             fi
             cd ..
-          } || true
+          fi
           
-          cd electron-windows 2>/dev/null && {
+          if [ -d "electron-windows" ]; then
+            echo "=== Processing Windows artifacts ==="
+            cd electron-windows
+            ls -la .
             if [ -d "win-unpacked" ]; then
               zip -r ../release/ios-bridge-desktop-windows-x64.zip "win-unpacked"
+              echo "Created Windows x64 package"
             fi
             cd ..
-          } || true
+          fi
           
-          cd electron-linux 2>/dev/null && {
+          if [ -d "electron-linux" ]; then
+            echo "=== Processing Linux artifacts ==="
+            cd electron-linux
+            ls -la .
             if [ -d "linux-unpacked" ]; then
               zip -r ../release/ios-bridge-desktop-linux-x64.zip "linux-unpacked"
+              echo "Created Linux x64 package"
             fi
             cd ..
-          } || true
+          fi
+          
+          echo "=== Final release directory ==="
+          ls -la release/
       
       - name: Create installer scripts
         run: |
@@ -325,16 +345,10 @@ jobs:
       
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: iOS Bridge CLI ${{ github.ref }}
-          draft: false
-          prerelease: false
-          body: |
-            ## iOS Bridge CLI Release
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "iOS Bridge CLI ${{ github.ref_name }}" \
+            --notes "## iOS Bridge CLI Release
             
             Cross-platform desktop client for iOS Bridge simulator sessions.
             
@@ -350,19 +364,26 @@ jobs:
             3. Follow the platform-specific README
             
             ### Checksums
-            See checksums.txt for file verification.
+            See checksums.txt for file verification."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Release Assets
         run: |
           # Upload auto-download Electron app ZIPs (required by CLI)
-          gh release upload ${{ github.ref }} release/ios-bridge-desktop-*.zip || true
+          ls -la release/
+          for file in release/ios-bridge-desktop-*.zip; do
+            if [ -f "$file" ]; then
+              gh release upload ${{ github.ref_name }} "$file" || echo "Failed to upload $file"
+            fi
+          done
           
           # Upload traditional platform packages  
-          gh release upload ${{ github.ref }} release/ios-bridge-cli-macos.tar.gz || true
-          gh release upload ${{ github.ref }} release/ios-bridge-cli-windows.zip || true
-          gh release upload ${{ github.ref }} release/ios-bridge-cli-linux.tar.gz || true
-          gh release upload ${{ github.ref }} release/ios-bridge-cli-python.tar.gz || true
-          gh release upload ${{ github.ref }} release/checksums.txt || true
+          gh release upload ${{ github.ref_name }} release/ios-bridge-cli-macos.tar.gz || echo "macOS package not found"
+          gh release upload ${{ github.ref_name }} release/ios-bridge-cli-windows.zip || echo "Windows package not found"
+          gh release upload ${{ github.ref_name }} release/ios-bridge-cli-linux.tar.gz || echo "Linux package not found"
+          gh release upload ${{ github.ref_name }} release/ios-bridge-cli-python.tar.gz || echo "Python package not found"
+          gh release upload ${{ github.ref_name }} release/checksums.txt || echo "Checksums not found"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -373,7 +394,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download Python artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: python-package
           path: dist/
