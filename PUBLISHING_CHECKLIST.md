@@ -195,9 +195,125 @@ gh release view v1.0.0
 
 ---
 
-### **Phase 4: Post-Publication Tasks (10-15 minutes)**
+### **Phase 4: Electron Desktop App Release (15-20 minutes)**
 
-#### ✅ Step 11: Test Installation on Each Platform
+Now that the CLI is published, let's build and release the Electron desktop apps for auto-download functionality.
+
+#### ✅ Step 11: Build Cross-Platform Electron Apps
+
+```bash
+cd /Users/himanshukukreja/autoflow/ios-bridge/ios-bridge-cli/ios_bridge_cli/electron_app
+
+# Install dependencies (if not already done)
+npm install
+
+# Build for all platforms
+npm run build-mac     # Creates macOS DMG + ZIP
+npm run build-win     # Creates Windows NSIS + Portable
+npm run build-linux   # Creates Linux AppImage + DEB + RPM
+
+# Check what was built
+ls -la dist/
+```
+
+#### ✅ Step 12: Package Electron Apps for GitHub Release
+
+```bash
+cd dist
+
+# Package each platform as ZIP with exact names expected by CLI
+zip -r ios-bridge-desktop-mac-arm64.zip "mac-arm64/iOS Bridge.app"
+zip -r ios-bridge-desktop-mac-x64.zip "mac-x64/iOS Bridge.app"
+zip -r ios-bridge-desktop-windows-x64.zip "win-unpacked/iOS Bridge.exe" 
+zip -r ios-bridge-desktop-linux-x64.zip "linux-unpacked/ios-bridge-desktop"
+
+# Move to a release directory
+mkdir -p ../../../dist/release/
+mv ios-bridge-desktop-*.zip ../../../dist/release/
+
+# Generate checksums
+cd ../../../dist/release/
+sha256sum *.zip > desktop-apps-checksums.txt
+
+# Verify files
+ls -la
+```
+
+#### ✅ Step 13: Update GitHub Release with Desktop Apps
+
+```bash
+# Option 1: GitHub CLI (recommended)
+gh release upload v1.0.0 \
+  dist/release/ios-bridge-desktop-mac-arm64.zip \
+  dist/release/ios-bridge-desktop-mac-x64.zip \
+  dist/release/ios-bridge-desktop-windows-x64.zip \
+  dist/release/ios-bridge-desktop-linux-x64.zip \
+  dist/release/desktop-apps-checksums.txt
+
+# Option 2: Manual upload via GitHub UI
+# Visit: https://github.com/your-username/ios-bridge/releases/tag/v1.0.0
+# Click "Edit release" and drag the ZIP files to upload
+```
+
+#### ✅ Step 14: Update app_manager.py GitHub Repository URL
+
+**IMPORTANT:** Update the repository URL in the auto-download code:
+
+```bash
+# Edit the file
+cd /Users/himanshukukreja/autoflow/ios-bridge/ios-bridge-cli/ios_bridge_cli
+```
+
+In `app_manager.py`, update line 28:
+```python
+GITHUB_REPO = "your-username/ios-bridge"  # Replace with your actual repo
+```
+
+Then republish the CLI with the correct repository URL:
+```bash
+# Increment version number
+cd /Users/himanshukukreja/autoflow/ios-bridge/ios-bridge-cli
+sed -i '' 's/version = "1.0.0"/version = "1.0.1"/' pyproject.toml
+
+# Rebuild and upload
+python -m build
+twine upload dist/ios_bridge_cli-1.0.1*
+
+# Update GitHub release tag
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+#### ✅ Step 15: Test Auto-Download Functionality
+
+```bash
+# Test in a fresh environment
+cd /tmp
+mkdir test-ios-bridge
+cd test-ios-bridge
+
+# Create virtual environment
+python -m venv test-env
+source test-env/bin/activate  # On Windows: test-env\Scripts\activate
+
+# Install from PyPI
+pip install ios-bridge-cli
+
+# Test auto-download (first time should download desktop app)
+ios-bridge desktop --help
+
+# This should show:
+# 🔍 iOS Bridge Desktop not found or outdated
+# 🏗️ Downloading iOS Bridge Desktop for macOS...
+# ████████████████████████████████████████ 25.4MB / 25.4MB
+# ✅ iOS Bridge Desktop installed successfully
+```
+
+---
+
+### **Phase 5: Post-Publication Tasks (10-15 minutes)**
+
+#### ✅ Step 16: Test Installation on Each Platform
 
 **macOS:**
 ```bash
@@ -211,7 +327,7 @@ chmod +x install.sh
 
 **Test the same for Windows and Linux** (or have others test)
 
-#### ✅ Step 12: Update Documentation
+#### ✅ Step 17: Update Documentation
 
 ```bash
 # Update README with actual installation instructions
@@ -224,7 +340,7 @@ cd /Users/himanshukukreja/autoflow/ios-bridge
 # - Updated screenshots if needed
 ```
 
-#### ✅ Step 13: Create Documentation
+#### ✅ Step 18: Create Documentation
 
 ```bash
 # Create a simple website or update README with:

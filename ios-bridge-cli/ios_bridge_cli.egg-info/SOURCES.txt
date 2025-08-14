@@ -8,6 +8,7 @@ TESTING_GUIDE.md
 USAGE.md
 build_and_package.py
 generate_icons.py
+old_build.py
 pyproject.toml
 requirements.txt
 setup.py
@@ -17,6 +18,8 @@ ios_bridge_cli/app_manager.py
 ios_bridge_cli/cli.py
 ios_bridge_cli/client.py
 ios_bridge_cli/exceptions.py
+ios_bridge_cli/electron_app/README.md
+ios_bridge_cli/electron_app/config.json
 ios_bridge_cli/electron_app/package-lock.json
 ios_bridge_cli/electron_app/package.json
 ios_bridge_cli/electron_app/assets/entitlements.mac.plist

@@ -51,8 +51,8 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/your-org/ios-bridge-cli"
-"Bug Tracker" = "https://github.com/your-org/ios-bridge-cli/issues"
+"Homepage" = "https://github.com/AutoFlowLabs/ios-bridge"
+"Bug Tracker" = "https://github.com/AutoFlowLabs/ios-bridge/issues"
 
 [project.scripts]
 ios-bridge = "ios_bridge_cli.cli:main"

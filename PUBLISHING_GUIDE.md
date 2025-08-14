@@ -6,10 +6,11 @@ Complete guide for publishing and distributing the iOS Bridge CLI package.
 
 1. [Pre-Publishing Checklist](#pre-publishing-checklist)
 2. [PyPI Publishing](#pypi-publishing)
-3. [GitHub Releases](#github-releases)
-4. [Distribution Platforms](#distribution-platforms)
-5. [Marketing and Promotion](#marketing-and-promotion)
-6. [Post-Release Tasks](#post-release-tasks)
+3. [Electron Desktop App Distribution](#electron-desktop-app-distribution)
+4. [GitHub Releases](#github-releases)
+5. [Distribution Platforms](#distribution-platforms)
+6. [Marketing and Promotion](#marketing-and-promotion)
+7. [Post-Release Tasks](#post-release-tasks)
 
 ---
 
@@ -169,20 +170,199 @@ git push origin v1.0.0
 
 ---
 
+## Electron Desktop App Distribution
+
+The iOS Bridge CLI includes an integrated Electron desktop app that provides a native streaming experience. The distribution strategy uses auto-download functionality to provide users with platform-specific binaries.
+
+### Architecture Overview
+
+**Development Mode (Current Setup):**
+- CLI bundles Electron source code
+- Requires Node.js and npm for `electron` dependency
+- Auto-detected when running from source directory
+
+**Production Mode (Auto-Download):**
+- CLI downloads pre-built platform-specific binaries
+- No Node.js requirement for end users
+- Cached locally for subsequent use
+
+### Building Electron Apps for Distribution
+
+#### 1. Build Cross-Platform Binaries
+
+```bash
+cd ios_bridge_cli/electron_app
+
+# Install dependencies
+npm install
+
+# Build for all platforms
+npm run build-mac     # macOS (DMG + ZIP) 
+npm run build-win     # Windows (NSIS + Portable)
+npm run build-linux   # Linux (AppImage + DEB + RPM)
+
+# Or build for current platform only
+npm run build
+```
+
+#### 2. Package Built Apps for GitHub Releases
+
+The built apps need to be packaged as ZIP files with specific naming convention:
+
+```bash
+# After building, package the distributables
+cd dist
+
+# macOS
+zip -r ios-bridge-desktop-mac-arm64.zip "mac-arm64/iOS Bridge.app"
+zip -r ios-bridge-desktop-mac-x64.zip "mac-x64/iOS Bridge.app"
+
+# Windows  
+zip -r ios-bridge-desktop-windows-x64.zip "win-unpacked/iOS Bridge.exe"
+
+# Linux
+zip -r ios-bridge-desktop-linux-x64.zip "linux-unpacked/ios-bridge-desktop"
+```
+
+**Required File Names:**
+- `ios-bridge-desktop-mac-arm64.zip`
+- `ios-bridge-desktop-mac-x64.zip` 
+- `ios-bridge-desktop-windows-x64.zip`
+- `ios-bridge-desktop-linux-x64.zip`
+
+### Auto-Download Configuration
+
+The CLI automatically detects the user's platform and downloads the appropriate binary:
+
+**Cache Locations:**
+- **macOS**: `~/Library/Caches/ios-bridge/desktop-apps/`
+- **Windows**: `%LOCALAPPDATA%/ios-bridge/cache/desktop-apps/`
+- **Linux**: `~/.cache/ios-bridge/desktop-apps/`
+
+**Version Management:**
+- Apps are cached per CLI version (`v1.0.0`, `v1.0.1`, etc.)
+- Automatic updates when CLI version changes
+- Fallback to bundled app if download fails
+
+### User Experience Flow
+
+1. **User installs CLI:**
+   ```bash
+   pip install ios-bridge-cli  # ~5MB package, fast install
+   ```
+
+2. **First desktop usage:**
+   ```bash
+   ios-bridge desktop
+   # 🏗️ Downloading iOS Bridge Desktop for macOS...
+   # ████████████████████████████████████████ 25.4MB / 25.4MB
+   # ✅ iOS Bridge Desktop installed successfully
+   # 🚀 Starting iOS Bridge Desktop
+   ```
+
+3. **Subsequent usage:**
+   ```bash
+   ios-bridge desktop  # Instant launch from cache
+   ```
+
+### Development vs Production Behavior
+
+The CLI automatically detects the environment:
+
+**Development Mode (Source Directory):**
+- Uses bundled Electron source (`ios_bridge_cli/electron_app/`)
+- Requires `npm install` and `electron` dependency
+- Enables live reloading for development
+
+**Production Mode (Installed via pip):**
+- Downloads platform-specific binary from GitHub releases
+- No Node.js dependency required
+- Cached for performance
+
+### Testing the Auto-Download
+
+Before releasing, test the auto-download functionality:
+
+```bash
+# Build test release assets
+cd ios_bridge_cli/electron_app
+npm run build-mac
+
+# Package for testing
+zip -r ios-bridge-desktop-mac-arm64.zip "dist/mac-arm64/iOS Bridge.app"
+
+# Upload to GitHub release (draft)
+# Test CLI download functionality
+pip install ios-bridge-cli
+ios-bridge desktop  # Should download and launch
+```
+
+### Troubleshooting
+
+**Download Fails:**
+- CLI automatically falls back to bundled app (requires Node.js)
+- Check GitHub release assets exist and are properly named
+- Verify internet connection and GitHub access
+
+**App Won't Launch:**
+- On macOS: Check Gatekeeper settings and app signing
+- On Linux: Verify executable permissions
+- Check cache directory permissions
+
+**Cache Issues:**
+```bash
+# Clear cache and force re-download
+python -c "from ios_bridge_cli.app_manager import ElectronAppManager; ElectronAppManager().clear_cache()"
+```
+
+---
+
 ## GitHub Releases
 
 ### 1. Prepare Release Assets
 
+#### A. Build CLI Packages
 ```bash
-# Build all platform packages
+# Build Python CLI packages
 cd ios-bridge-cli
-python build_and_package.py
+python -m build
 
 # This creates:
-# - dist/release/ios-bridge-cli-v1.0.0-macos/
-# - dist/release/ios-bridge-cli-v1.0.0-windows/
-# - dist/release/ios-bridge-cli-v1.0.0-linux/
-# - dist/release/checksums.txt
+# - dist/ios_bridge_cli-1.0.0-py3-none-any.whl
+# - dist/ios_bridge_cli-1.0.0.tar.gz
+```
+
+#### B. Build Electron Desktop Apps
+```bash
+# Build Electron apps for all platforms
+cd ios_bridge_cli/electron_app
+npm install
+npm run build-mac
+npm run build-win  
+npm run build-linux
+
+# Package for GitHub release
+cd dist
+
+# macOS
+zip -r ios-bridge-desktop-mac-arm64.zip "mac-arm64/iOS Bridge.app"
+zip -r ios-bridge-desktop-mac-x64.zip "mac-x64/iOS Bridge.app"
+
+# Windows
+zip -r ios-bridge-desktop-windows-x64.zip "win-unpacked/iOS Bridge.exe"
+
+# Linux  
+zip -r ios-bridge-desktop-linux-x64.zip "linux-unpacked/ios-bridge-desktop"
+
+# Move to release directory
+mkdir -p ../../dist/release/
+mv *.zip ../../dist/release/
+```
+
+#### C. Generate Checksums
+```bash
+cd dist/release
+sha256sum * > checksums.txt
 ```
 
 ### 2. Create GitHub Release
@@ -197,12 +377,16 @@ python build_and_package.py
 
 **Option 2: GitHub CLI**
 ```bash
-# Create release with CLI
+# Create release with CLI and Electron assets
 gh release create v1.0.0 \
   --title "iOS Bridge CLI v1.0.0" \
   --notes-file RELEASE_NOTES.md \
-  dist/release/ios-bridge-cli-*.tar.gz \
-  dist/release/ios-bridge-cli-*.zip \
+  dist/ios_bridge_cli-1.0.0-py3-none-any.whl \
+  dist/ios_bridge_cli-1.0.0.tar.gz \
+  dist/release/ios-bridge-desktop-mac-arm64.zip \
+  dist/release/ios-bridge-desktop-mac-x64.zip \
+  dist/release/ios-bridge-desktop-windows-x64.zip \
+  dist/release/ios-bridge-desktop-linux-x64.zip \
   dist/release/checksums.txt
 ```
 

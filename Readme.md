@@ -133,9 +133,24 @@ xcrun simctl list runtimes
 
 ## 🖥️ Electron Desktop App
 
-### iOS Bridge CLI
+### iOS Bridge CLI Integration
 
 A powerful command-line interface with integrated Electron desktop application for native iOS simulator control.
+
+**🔗 How It Works:**
+- The Electron app works as a **client** that connects to the iOS Bridge CLI server
+- CLI server creates streaming sessions and automatically launches the desktop app
+- Desktop app provides a native macOS experience for iOS device interaction
+- **Not standalone**: Requires the CLI server to be running first
+
+**🚀 Quick Start:**
+```bash
+# Recommended: Full integration (starts server + desktop app)
+ios-bridge desktop
+
+# Alternative: Web interface with optional desktop
+ios-bridge stream  # Then launch desktop separately if needed
+```
 
 #### 🚀 **Key Features**
 

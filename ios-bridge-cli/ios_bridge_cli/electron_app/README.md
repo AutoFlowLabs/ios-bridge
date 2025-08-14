@@ -2,23 +2,45 @@
 
 A desktop streaming client for iOS Bridge that provides a native desktop experience for iOS device streaming.
 
+## ⚠️ Important: How This App Works
+
+The Electron desktop app is designed to work as a **client** that connects to the iOS Bridge CLI server. It's **not meant to run standalone** - it requires the iOS Bridge server to be running first.
+
+### Normal Workflow (Production)
+1. User runs `ios-bridge desktop` or `ios-bridge stream` 
+2. CLI starts the server and creates a streaming session
+3. CLI automatically launches this Electron app with proper configuration
+4. Electron app connects to the CLI server and displays the iOS device stream
+
+### Development/Testing Workflow
+- **For full integration testing:** Run `ios-bridge desktop` - this will start the server and launch the app automatically
+- **For standalone UI testing:** Use the static `config.json` (see below) and run `npm run dev`
+- **Expected behavior when testing standalone:** You'll see "Connection error: Missing session ID or server URL" - this is normal without a running server
+
 ## Quick Start
 
-### Development Mode
+### Recommended: Full Integration Testing
 ```bash
-npm run dev
+# This is the proper way to test the app
+ios-bridge desktop
 ```
-This opens the app with developer tools enabled.
 
-### Production Mode
+### Standalone UI Testing (Limited Functionality)
 ```bash
-npm run start
+npm run dev  # With developer tools
+npm run start  # Production mode
 ```
-This opens the app in production mode.
 
 ## Configuration
 
-The app uses a `config.json` file to configure the connection and display settings:
+### Production Configuration (Automatic)
+In production, the iOS Bridge CLI automatically:
+- Creates a temporary config file with real session information  
+- Launches the Electron app with `electron . --config /tmp/ios_bridge_config_xxx.json`
+- Passes live server details, session ID, and device information
+
+### Development Configuration (Manual)
+For standalone UI testing, the app uses this static `config.json` file:
 
 ```json
 {
@@ -92,29 +114,43 @@ Before starting the desktop app, ensure:
 
 ## Usage with iOS Bridge CLI
 
+### Recommended (Automatic Integration)
+```bash
+# This starts the server AND launches the desktop app automatically
+ios-bridge desktop
+
+# Or use the web interface and launch desktop separately
+ios-bridge stream --desktop
+```
+
+### Manual Testing (Advanced)
 1. Start the iOS Bridge server:
    ```bash
    ios-bridge stream
    ```
 
-2. Update `config.json` with the correct server details
+2. Update `config.json` with the correct server details and session ID from the CLI output
 
 3. Start the desktop app:
    ```bash
    npm run start
    ```
 
-The desktop app will automatically connect to the server and begin streaming the iOS device.
-
 ## Troubleshooting
+
+**App shows "Connection error: Missing session ID or server URL"**
+- This is **normal** when running the app standalone without a server
+- Solution: Run `ios-bridge desktop` instead for full integration
+- For testing: Ensure the iOS Bridge server is running first
 
 **App shows "No config file specified"**
 - Ensure you're running `npm run start` which includes the `--config config.json` parameter
+- The CLI automatically handles this in production
 
-**Connection errors**
-- Verify the iOS Bridge server is running
-- Check that serverHost and serverPort in config.json match your server settings
-- Ensure the device is connected and streaming
+**Connection errors when using with CLI**
+- Verify the iOS Bridge server is running with `ios-bridge stream`
+- Check that no firewall is blocking localhost connections
+- Ensure an iOS device/simulator is connected and available
 
 **Window sizing issues**
 - The app automatically scales to fit your screen

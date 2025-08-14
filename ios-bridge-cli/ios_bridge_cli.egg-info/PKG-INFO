@@ -6,8 +6,8 @@ Home-page: https://github.com/your-org/ios-bridge-cli
 Author: iOS Bridge Team
 Author-email: iOS Bridge Team <support@iosbridge.dev>
 License: MIT
-Project-URL: Homepage, https://github.com/your-org/ios-bridge-cli
-Project-URL: Bug Tracker, https://github.com/your-org/ios-bridge-cli/issues
+Project-URL: Homepage, https://github.com/AutoFlowLabs/ios-bridge
+Project-URL: Bug Tracker, https://github.com/AutoFlowLabs/ios-bridge/issues
 Keywords: ios,simulator,bridge,streaming,electron,desktop,mobile,testing
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers

@@ -266,8 +266,11 @@ def stream(ctx, session_id: str, quality: str, fullscreen: bool, always_on_top: 
             click.echo(f"📱 Session info: {session_info.get('device_type', 'Unknown')} "
                       f"iOS {session_info.get('ios_version', 'Unknown')}")
         
+        # Check if we're in development mode (running from source)
+        dev_mode = Path(__file__).parent.parent.name == "ios-bridge-cli" and (Path(__file__).parent.parent / "pyproject.toml").exists()
+        
         # Initialize Electron app manager
-        cli_context.app_manager = ElectronAppManager(verbose=verbose)
+        cli_context.app_manager = ElectronAppManager(verbose=verbose, dev_mode=dev_mode)
         
         # Add cleanup handler
         cli_context.add_cleanup_handler(lambda: cli_context.app_manager.stop() if cli_context.app_manager else None)
