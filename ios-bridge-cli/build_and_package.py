@@ -366,8 +366,8 @@ ios-bridge --help
 ```
 
 ## Support
-- GitHub: https://github.com/your-org/ios-bridge-cli
-- Documentation: https://github.com/your-org/ios-bridge-cli/wiki
+- GitHub: https://github.com/AutoFlowLabs/ios-bridge-cli
+- Documentation: https://github.com/AutoFlowLabs/ios-bridge-cli/wiki
 """
                 (platform_release / "README.md").write_text(readme_content)
                 

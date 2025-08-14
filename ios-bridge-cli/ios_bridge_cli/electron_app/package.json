@@ -1,6 +1,6 @@
 {
   "name": "ios-bridge-desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Desktop streaming client for iOS Bridge",
   "main": "src/main.js",
   "scripts": {
@@ -102,7 +102,7 @@
         }
       ],
       "category": "Development",
-      "maintainer": "iOS Bridge Team <support@iosbridge.dev>",
+      "maintainer": "iOS Bridge Team <kukreja.him@gmail.com>",
       "vendor": "iOS Bridge Team",
       "synopsis": "Desktop streaming client for iOS Bridge simulator sessions",
       "description": "Cross-platform desktop client for iOS Bridge that provides real-time streaming and control of iOS simulators with WebSocket and WebRTC support."
@@ -123,7 +123,7 @@
   },
   "author": {
     "name": "iOS Bridge Team",
-    "email": "support@iosbridge.dev"
+    "email": "kukreja.him@gmail.com"
   },
   "homepage": "https://github.com/AutoFlowLabs/ios-bridge",
   "repository": {

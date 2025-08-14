@@ -249,7 +249,7 @@ def check_server_command_available():
               help='Keep window always on top')
 @click.pass_context
 def stream(ctx, session_id: str, quality: str, fullscreen: bool, always_on_top: bool):
-    """Stream and control an iOS simulator session in a desktop window"""
+    """Stream and control an iOS simulator session in a desktop window (auto-downloads desktop app)"""
     
     server = ctx.obj['server']
     verbose = ctx.obj['verbose']
@@ -266,8 +266,18 @@ def stream(ctx, session_id: str, quality: str, fullscreen: bool, always_on_top: 
             click.echo(f"📱 Session info: {session_info.get('device_type', 'Unknown')} "
                       f"iOS {session_info.get('ios_version', 'Unknown')}")
         
-        # Check if we're in development mode (running from source)
-        dev_mode = Path(__file__).parent.parent.name == "ios-bridge-cli" and (Path(__file__).parent.parent / "pyproject.toml").exists()
+        # Force production mode when installed via pip to use auto-download
+        # Only use dev_mode when explicitly running from source directory
+        running_from_source = (
+            Path(__file__).parent.parent.name == "ios-bridge-cli" and 
+            (Path(__file__).parent.parent / "pyproject.toml").exists() and
+            not Path(__file__).resolve().parts[:-4] == ('.venv', 'lib', 'python3.11', 'site-packages')
+        )
+        dev_mode = running_from_source
+        
+        if verbose:
+            mode = "development (bundled source)" if dev_mode else "production (auto-download)"
+            click.echo(f"🔧 Running in {mode} mode")
         
         # Initialize Electron app manager
         cli_context.app_manager = ElectronAppManager(verbose=verbose, dev_mode=dev_mode)
@@ -1029,6 +1039,7 @@ def remote_help(ctx):
     click.echo("• Teams connect from any OS using CLI")
     click.echo("• Sessions persist across CLI connections")
     click.echo("• Multiple users can share same server instance")
+
 
 
 @cli.command()

@@ -36,8 +36,8 @@ cd /Users/himanshukukreja/autoflow/ios-bridge/ios-bridge-cli
 ```
 
 Replace these in `pyproject.toml`:
-- `"Homepage" = "https://github.com/your-org/ios-bridge-cli"`
-- `"Bug Tracker" = "https://github.com/your-org/ios-bridge-cli/issues"`
+- `"Homepage" = "https://github.com/AutoFlowLabs/ios-bridge-cli"`
+- `"Bug Tracker" = "https://github.com/AutoFlowLabs/ios-bridge-cli/issues"`
 
 With your actual GitHub repository URL.
 

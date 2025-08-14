@@ -1,10 +1,10 @@
 Metadata-Version: 2.4
 Name: ios-bridge-cli
-Version: 1.0.0
+Version: 1.0.3
 Summary: Desktop streaming client for iOS Bridge simulator sessions with Electron app integration
-Home-page: https://github.com/your-org/ios-bridge-cli
+Home-page: https://github.com/AutoFlowLabs/ios-bridge
 Author: iOS Bridge Team
-Author-email: iOS Bridge Team <support@iosbridge.dev>
+Author-email: iOS Bridge Team <kukreja.him@gmail.com>
 License: MIT
 Project-URL: Homepage, https://github.com/AutoFlowLabs/ios-bridge
 Project-URL: Bug Tracker, https://github.com/AutoFlowLabs/ios-bridge/issues

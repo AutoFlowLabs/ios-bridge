@@ -25,14 +25,14 @@ Update `app_manager.py` to:
 # User installs CLI
 pip install ios-bridge-cli
 
-# First time running desktop mode
-ios-bridge desktop
+# First time running stream mode
+ios-bridge stream <session-id>
 # CLI shows: "🏗️ Downloading iOS Bridge Desktop for macOS..."
 # CLI downloads DMG, extracts app, caches it
 # CLI launches desktop app
 
 # Subsequent runs use cached app
-ios-bridge desktop  # Instant launch
+ios-bridge stream <session-id>  # Instant launch
 ```
 
 ## Implementation Plan

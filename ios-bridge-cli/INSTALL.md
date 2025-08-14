@@ -36,7 +36,7 @@ pip install ios-bridge-cli
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/ios-bridge-cli
+git clone https://github.com/AutoFlowLabs/ios-bridge-cli
 cd ios-bridge-cli
 
 # Install in development mode
@@ -186,7 +186,7 @@ pip uninstall ios-bridge-cli
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/ios-bridge-cli
+git clone https://github.com/AutoFlowLabs/ios-bridge-cli
 cd ios-bridge-cli
 
 # Install in development mode
@@ -214,6 +214,6 @@ ios-bridge --verbose stream <session_id>
 
 ## Support
 
-- **Documentation**: https://github.com/your-org/ios-bridge-cli
-- **Issues**: https://github.com/your-org/ios-bridge-cli/issues
-- **Discussions**: https://github.com/your-org/ios-bridge-cli/discussions
+- **Documentation**: https://github.com/AutoFlowLabs/ios-bridge-cli
+- **Issues**: https://github.com/AutoFlowLabs/ios-bridge-cli/issues
+- **Discussions**: https://github.com/AutoFlowLabs/ios-bridge-cli/discussions

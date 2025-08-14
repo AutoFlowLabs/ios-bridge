@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ios-bridge-cli"
-version = "1.0.2"
+version = "1.0.3"
 description = "Desktop streaming client for iOS Bridge simulator sessions with Electron app integration"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "iOS Bridge Team", email = "support@iosbridge.dev"},
+    {name = "iOS Bridge Team", email = "kukreja.him@gmail.com"},
 ]
 keywords = ["ios", "simulator", "bridge", "streaming", "electron", "desktop", "mobile", "testing"]
 classifiers = [

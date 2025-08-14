@@ -33,14 +33,14 @@ The CLI includes:
 ### First Launch
 
 ```bash
-# Start with desktop interface (automatically downloads desktop app)
-ios-bridge desktop
+# First list available sessions
+ios-bridge list
 
-# Or start with web interface
-ios-bridge stream
+# Start streaming with desktop interface (automatically downloads desktop app)
+ios-bridge stream <session-id>
 ```
 
-**First time desktop usage will show:**
+**First time usage will show:**
 ```
 🔍 iOS Bridge Desktop not found or outdated
 🏗️ Downloading iOS Bridge Desktop for macOS...
@@ -65,8 +65,9 @@ ios-bridge stream
 # Install Python CLI
 pip3 install ios-bridge-cli
 
-# First desktop app usage (auto-downloads)
-ios-bridge desktop
+# First usage (auto-downloads desktop app)
+ios-bridge list
+ios-bridge stream <session-id>
 ```
 
 **Note:** Desktop app will be cached in `~/Library/Caches/ios-bridge/` for future use.
@@ -91,8 +92,8 @@ When first launching the desktop app, macOS may show a security warning:
 # Open Command Prompt or PowerShell
 pip install ios-bridge-cli
 
-# First desktop app usage (auto-downloads)
-ios-bridge desktop
+# First usage (auto-downloads desktop app)
+ios-bridge stream <session-id>
 ```
 
 **Note:** Desktop app will be cached in `%LOCALAPPDATA%/ios-bridge/cache/` for future use.
@@ -114,8 +115,8 @@ Windows may scan the downloaded desktop app:
 # Install CLI
 pip3 install ios-bridge-cli
 
-# First desktop app usage (auto-downloads)
-ios-bridge desktop
+# First usage (auto-downloads desktop app)
+ios-bridge stream <session-id>
 ```
 
 **Note:** Desktop app will be cached in `~/.cache/ios-bridge/` for future use.
@@ -142,34 +143,34 @@ ios-bridge list
 
 ### 2. Start Streaming
 
-**Desktop App (Recommended):**
+**Desktop Interface (Recommended):**
 ```bash
-ios-bridge desktop
+ios-bridge stream <session-id>
 ```
 
 **Web Interface:**
 ```bash
-ios-bridge stream
+ios-bridge stream <session-id> --web-only
 # Open browser to: http://localhost:8000
 ```
 
 **Select specific device:**
 ```bash
-ios-bridge desktop --device "iPhone 15 Pro"
+ios-bridge stream <session-id> --device "iPhone 15 Pro"
 ```
 
 ### 3. Usage Examples
 
 ```bash
 # Desktop mode with specific device and quality
-ios-bridge desktop --device "iPhone 15 Pro" --quality high
+ios-bridge stream <session-id> --device "iPhone 15 Pro" --quality high
 
 # Web mode on custom port
-ios-bridge stream --port 9000
+ios-bridge stream <session-id> --port 9000 --web-only
 
 # Help and options
 ios-bridge --help
-ios-bridge desktop --help
+ios-bridge stream --help
 ```
 
 ---
@@ -187,7 +188,7 @@ source ios-bridge-env/bin/activate  # On Windows: ios-bridge-env\Scripts\activat
 pip install ios-bridge-cli
 
 # Use as normal
-ios-bridge desktop
+ios-bridge stream <session-id>
 ```
 
 ### Global Installation with pipx
@@ -200,7 +201,7 @@ pip install pipx
 pipx install ios-bridge-cli
 
 # Use from anywhere
-ios-bridge desktop
+ios-bridge stream <session-id>
 ```
 
 ### Upgrade to Latest Version
@@ -210,7 +211,7 @@ ios-bridge desktop
 pip install --upgrade ios-bridge-cli
 
 # Desktop app will auto-update to match CLI version
-ios-bridge desktop  # Downloads new version if needed
+ios-bridge stream <session-id>  # Downloads new version if needed
 ```
 
 ---
@@ -233,7 +234,7 @@ cd ios_bridge_cli/electron_app
 npm install
 
 # Run in development mode (uses bundled source)
-ios-bridge desktop  # Automatically uses development mode
+ios-bridge stream <session-id>  # Automatically uses development mode
 ```
 
 ### Development vs Production Behavior
@@ -263,10 +264,10 @@ curl -I https://github.com
 
 # Clear cache and retry
 python3 -c "from ios_bridge_cli.app_manager import ElectronAppManager; ElectronAppManager().clear_cache()"
-ios-bridge desktop
+ios-bridge stream <session-id>
 
 # Use verbose mode for debugging
-ios-bridge desktop --verbose
+ios-bridge stream <session-id> --verbose
 ```
 
 **Problem:** "No Node.js found" error in development mode
@@ -340,8 +341,7 @@ python3 -c "from ios_bridge_cli.app_manager import ElectronAppManager; print(Ele
 
 **Enable verbose logging:**
 ```bash
-ios-bridge desktop --verbose
-ios-bridge stream --verbose
+ios-bridge stream <session-id> --verbose
 ```
 
 **Report issues:**

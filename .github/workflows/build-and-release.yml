@@ -9,7 +9,7 @@ on:
       version:
         description: 'Release version (e.g., v1.0.0)'
         required: true
-        default: 'v1.0.2'
+        default: 'v1.0.3'
 
 permissions:
   contents: write
@@ -331,8 +331,8 @@ jobs:
           
           ## Support
           
-          - GitHub: https://github.com/your-org/ios-bridge
-          - Issues: https://github.com/your-org/ios-bridge/issues
+          - GitHub: https://github.com/AutoFlowLabs/ios-bridge
+          - Issues: https://github.com/AutoFlowLabs/ios-bridge/issues
           EOF
           
           # Platform-specific READMEs

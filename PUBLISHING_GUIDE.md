@@ -737,7 +737,7 @@ ios-bridge desktop --help
 ```bash
 # Create homebrew formula
 # Submit PR to homebrew-core or create tap
-brew tap your-org/ios-bridge
+brew tap AutoFlowLabs/ios-bridge
 brew install ios-bridge-cli
 ```
 
@@ -776,8 +776,8 @@ CMD ["ios-bridge", "start-server"]
 **GitHub Container Registry**
 ```bash
 # Build and push
-docker build -t ghcr.io/your-org/ios-bridge:latest .
-docker push ghcr.io/your-org/ios-bridge:latest
+docker build -t ghcr.io/AutoFlowLabs/ios-bridge:latest .
+docker push ghcr.io/AutoFlowLabs/ios-bridge:latest
 ```
 
 ### 3. Cloud Marketplaces

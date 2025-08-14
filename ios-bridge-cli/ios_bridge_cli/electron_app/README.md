@@ -7,13 +7,13 @@ A desktop streaming client for iOS Bridge that provides a native desktop experie
 The Electron desktop app is designed to work as a **client** that connects to the iOS Bridge CLI server. It's **not meant to run standalone** - it requires the iOS Bridge server to be running first.
 
 ### Normal Workflow (Production)
-1. User runs `ios-bridge desktop` or `ios-bridge stream` 
+1. User runs `ios-bridge stream <session-id>` 
 2. CLI starts the server and creates a streaming session
 3. CLI automatically launches this Electron app with proper configuration
 4. Electron app connects to the CLI server and displays the iOS device stream
 
 ### Development/Testing Workflow
-- **For full integration testing:** Run `ios-bridge desktop` - this will start the server and launch the app automatically
+- **For full integration testing:** Run `ios-bridge stream <session-id>` - this will start the server and launch the app automatically
 - **For standalone UI testing:** Use the static `config.json` (see below) and run `npm run dev`
 - **Expected behavior when testing standalone:** You'll see "Connection error: Missing session ID or server URL" - this is normal without a running server
 
@@ -22,7 +22,7 @@ The Electron desktop app is designed to work as a **client** that connects to th
 ### Recommended: Full Integration Testing
 ```bash
 # This is the proper way to test the app
-ios-bridge desktop
+ios-bridge stream <session-id>
 ```
 
 ### Standalone UI Testing (Limited Functionality)
@@ -117,10 +117,10 @@ Before starting the desktop app, ensure:
 ### Recommended (Automatic Integration)
 ```bash
 # This starts the server AND launches the desktop app automatically
-ios-bridge desktop
+ios-bridge stream <session-id>
 
-# Or use the web interface and launch desktop separately
-ios-bridge stream --desktop
+# Or use the web interface only
+ios-bridge stream <session-id> --web-only
 ```
 
 ### Manual Testing (Advanced)
@@ -140,7 +140,7 @@ ios-bridge stream --desktop
 
 **App shows "Connection error: Missing session ID or server URL"**
 - This is **normal** when running the app standalone without a server
-- Solution: Run `ios-bridge desktop` instead for full integration
+- Solution: Run `ios-bridge stream <session-id>` instead for full integration
 - For testing: Ensure the iOS Bridge server is running first
 
 **App shows "No config file specified"**

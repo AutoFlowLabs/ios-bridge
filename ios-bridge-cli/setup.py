@@ -8,13 +8,13 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name="ios-bridge-cli",
-    version="1.0.1",
+    version="1.0.0",
     description="Desktop streaming client for iOS Bridge simulator sessions",
     long_description=long_description,
     long_description_content_type='text/markdown',
     author="iOS Bridge Team",
-    author_email="support@iosbridge.dev",
-    url="https://github.com/your-org/ios-bridge-cli",
+    author_email="kukreja.him@gmail.com",
+    url="https://github.com/AutoFlowLabs/ios-bridge-cli",
     packages=find_packages(),
     include_package_data=True,
     package_data={
