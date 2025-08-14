@@ -8,15 +8,15 @@ This is the **most common use case** for iOS Bridge: developers want to stream a
 
 **Architecture:**
 - **Mac (Server)**: Runs iOS simulators and iOS Bridge server
-- **Windows/Linux (Clients)**: Connect remotely with full desktop app functionality
+- **Windows/Linux (Clients)**: Connect via advanced web interface or basic desktop app
 
 ---
 
 ## Quick Start Summary
 
 1. **Mac**: `ios-bridge start-server --host 0.0.0.0 --port 8000`
-2. **Client Desktop App**: `ios-bridge connect http://[MAC-IP]:8000 --save` then `ios-bridge stream <session-id>`
-3. **Client Web Browser**: Open `http://[MAC-IP]:8000` directly (no CLI needed)
+2. **Client Web Browser** (Recommended): Open `http://[MAC-IP]:8000` directly - **full feature set, no installation**
+3. **Client Desktop App** (Basic): `ios-bridge connect http://[MAC-IP]:8000 --save` then `ios-bridge stream <session-id>`
 
 ---
 
@@ -148,7 +148,23 @@ ios-bridge list
 
 #### Step 4: Stream iOS Simulator
 
-**Option A: Desktop App (Recommended)**
+**Option A: Web Interface (Recommended - Full Features)**
+```bash
+# Access via web browser directly (no CLI needed)
+# Open in browser: http://192.168.0.101:8000
+# (Replace 192.168.0.101 with your Mac's IP)
+
+# Features available in web interface:
+# ✅ WebRTC + WebSocket streaming
+# ✅ Install and launch IPA files
+# ✅ File transfer (push/pull)
+# ✅ Mock location, deep links, text input
+# ✅ Real-time device logs
+# ✅ Advanced gesture controls
+# ✅ Hardware button simulation
+```
+
+**Option B: Desktop App (Basic Streaming)**
 ```bash
 # Stream a session in desktop app (auto-downloads desktop app)
 ios-bridge stream <session-id>
@@ -159,17 +175,9 @@ ios-bridge stream <session-id>
 # ████████████████████████████████████████ 25.4MB / 25.4MB
 # ✅ iOS Bridge Desktop installed successfully
 # 🚀 Starting iOS Bridge Desktop
-```
 
-**Option B: Web Interface**
-```bash
-# Access via web browser directly (no CLI needed)
-# Open in browser: http://192.168.0.101:8000
-# (Replace 192.168.0.101 with your Mac's IP)
-
-# Or use CLI with web-only mode
-ios-bridge stream <session-id> --web-only
-# Then open: http://localhost:8000 (redirects to Mac server)
+# Note: Desktop app currently supports basic streaming only
+# Advanced features (file transfer, app management, etc.) coming soon
 ```
 
 ---
@@ -452,18 +460,29 @@ ios-bridge info SESSION-ID
 | Feature | Desktop App | Web Interface |
 |---------|-------------|---------------|
 | **Installation** | Requires Python + CLI | No installation needed |
-| **Performance** | Native desktop performance | Browser-based, slightly slower |
-| **Features** | Full CLI features | Streaming and basic controls |
-| **Shortcuts** | Native keyboard shortcuts | Browser shortcuts |
-| **Session Management** | Create, list, terminate sessions | View and stream existing sessions |
+| **Performance** | Native desktop performance | Browser-based, excellent performance |
+| **Features** | Basic streaming only | **🚀 Advanced feature-rich interface** |
+| **Streaming Modes** | WebSocket only | WebSocket + WebRTC |
+| **App Management** | Not available | Install/launch IPA files |
+| **File Transfer** | Not available | Push/pull files to/from simulator |
+| **Deep Links & URLs** | Not available | Open URLs and deep links |
+| **Text Input** | Not available | Send text to simulator |
+| **Gesture Controls** | Basic touch only | Swipe mode, multi-touch gestures |
+| **Mock Location** | Not available | Set custom GPS coordinates |
+| **Device Logs** | Not available | Real-time log viewing and filtering |
+| **Hardware Buttons** | Not available | Home, Lock, Side button, Volume |
+| **System Controls** | Not available | Restart pipeline, status checks |
 | **Screenshots** | Save to custom locations | Download via browser |
+| **Session Management** | Create, list, terminate sessions | View and stream existing sessions |
 | **Auto-updates** | Automatic with CLI updates | Always latest via browser |
-| **Offline Usage** | Works after first download | Requires active server connection |
-| **Multi-monitor** | Native window management | Browser tab/window management |
+
+**Current Status**: 
+- **Web Interface**: ✅ **Feature-complete with advanced controls**
+- **Desktop App**: ⚠️ **Basic streaming only** - advanced features coming soon
 
 **Recommendation**: 
-- **Desktop App**: For developers doing active development and testing
-- **Web Interface**: For quick demos, QA testing, or users who prefer browser-based tools
+- **Web Interface**: **Recommended for all users** - full feature set available
+- **Desktop App**: For users who prefer native desktop apps (advanced features in development)
 
 ---
 
