@@ -1,0 +1,20 @@
+{
+    "sessionId": "bddf902f-4ccd-4712-8c60-d05a80bacc27",
+    "sessionInfo": {
+        "device_type": "iPhone 15 Pro",
+        "device_width": 393,
+        "device_height": 852,
+        "stream_width": 393,
+        "stream_height": 852,
+        "scale_factor": 3.0
+    },
+    "serverPort": 8000,
+    "serverHost": "localhost",
+    "fullscreen": false,
+    "alwaysOnTop": false,
+    "streaming": {
+        "protocol": "websocket",
+        "fps": 30,
+        "quality": "high"
+    }
+}

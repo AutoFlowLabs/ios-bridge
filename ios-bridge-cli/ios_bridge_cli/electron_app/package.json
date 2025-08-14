@@ -4,12 +4,12 @@
   "description": "Desktop streaming client for iOS Bridge",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron . --config config.json",
     "build": "electron-builder",
     "build-mac": "electron-builder --mac",
     "build-win": "electron-builder --win",
     "build-linux": "electron-builder --linux",
-    "dev": "electron . --dev",
+    "dev": "electron . --dev --config config.json",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
@@ -24,7 +24,8 @@
       "src/**/*",
       "assets/**/*",
       "node_modules/**/*",
-      "package.json"
+      "package.json",
+      "config.json"
     ],
     "extraResources": [
       {
@@ -76,8 +77,7 @@
             "ia32"
           ]
         }
-      ],
-      "publisherName": "iOS Bridge Team"
+      ]
     },
     "linux": {
       "icon": "assets/icons/icon.png",

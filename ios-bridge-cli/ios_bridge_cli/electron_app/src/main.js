@@ -283,8 +283,10 @@ class IOSBridgeApp {
             }
         });
         
-        // Development tools - always enable for debugging
-        this.mainWindow.webContents.openDevTools();
+        // Development tools - only open in dev mode
+        if (process.argv.includes('--dev')) {
+            this.mainWindow.webContents.openDevTools();
+        }
         
         // Forward console messages to main process (but filter out noisy ones)
         this.mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
