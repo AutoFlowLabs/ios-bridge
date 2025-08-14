@@ -268,16 +268,43 @@ def stream(ctx, session_id: str, quality: str, fullscreen: bool, always_on_top: 
         
         # Force production mode when installed via pip to use auto-download
         # Only use dev_mode when explicitly running from source directory
-        running_from_source = (
-            Path(__file__).parent.parent.name == "ios-bridge-cli" and 
-            (Path(__file__).parent.parent / "pyproject.toml").exists() and
-            not Path(__file__).resolve().parts[:-4] == ('.venv', 'lib', 'python3.11', 'site-packages')
+        file_path = Path(__file__).resolve()
+        
+        # Multiple ways to detect pip/wheel installation
+        is_pip_install = (
+            'site-packages' in str(file_path) or
+            'dist-packages' in str(file_path) or  # Debian/Ubuntu
+            '.egg' in str(file_path) or
+            '/usr/local/lib/python' in str(file_path) or
+            '/usr/lib/python' in str(file_path) or
+            str(file_path).endswith('.whl') or  # Direct wheel install
+            '/lib/python' in str(file_path)  # Any lib/python path
         )
-        dev_mode = running_from_source
+        
+        # Check if running from actual source checkout (very strict)
+        current_dir = Path.cwd()
+        running_from_source_dir = (
+            current_dir.name == "ios-bridge-cli" and
+            (current_dir / "pyproject.toml").exists() and
+            (current_dir / ".git").exists() and
+            str(file_path).startswith(str(current_dir))
+        )
+        
+        # ALWAYS use production mode unless running directly from source directory
+        # This ensures pip installs, wheel installs, and local builds all use production mode
+        dev_mode = running_from_source_dir and not is_pip_install
         
         if verbose:
             mode = "development (bundled source)" if dev_mode else "production (auto-download)"
             click.echo(f"🔧 Running in {mode} mode")
+            click.echo(f"🔍 Debug info:")
+            click.echo(f"   File path: {file_path}")
+            click.echo(f"   Current dir: {current_dir}")
+            click.echo(f"   Is pip install: {is_pip_install}")
+            click.echo(f"   Running from source dir: {running_from_source_dir}")
+            click.echo(f"   Current dir name: {current_dir.name}")
+            click.echo(f"   Pyproject exists: {(current_dir / 'pyproject.toml').exists()}")
+            click.echo(f"   Git dir exists: {(current_dir / '.git').exists()}")
         
         # Initialize Electron app manager
         cli_context.app_manager = ElectronAppManager(verbose=verbose, dev_mode=dev_mode)

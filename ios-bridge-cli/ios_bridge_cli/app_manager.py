@@ -194,23 +194,24 @@ class ElectronAppManager:
     def _get_latest_release(self) -> dict:
         """Get the latest release information from GitHub"""
         try:
-            # For now, use a specific version. In production, fetch from GitHub API
-            # response = requests.get(f"{self.GITHUB_API_URL}/releases/latest")
-            # response.raise_for_status()
-            # return response.json()
+            # Try to get the latest release from GitHub API
+            response = requests.get(f"{self.GITHUB_API_URL}/releases/latest", timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            if self.verbose:
+                print(f"⚠️  Failed to fetch latest release, using fallback: {e}")
             
-            # Mock release data for now
+            # Fallback to known working release
             return {
-                "tag_name": f"v{self.current_version}",
+                "tag_name": "v1.0.2",  # Use last known working release
                 "assets": [
                     {
                         "name": self._get_app_binary_name(),
-                        "browser_download_url": f"https://github.com/{self.GITHUB_REPO}/releases/download/v{self.current_version}/{self._get_app_binary_name()}"
+                        "browser_download_url": f"https://github.com/{self.GITHUB_REPO}/releases/download/v1.0.2/{self._get_app_binary_name()}"
                     }
                 ]
             }
-        except requests.RequestException as e:
-            raise ElectronAppError(f"Failed to fetch release information: {e}")
     
     def _download_app(self):
         """Download the appropriate Electron app for the current platform"""
@@ -320,9 +321,14 @@ class ElectronAppManager:
                 except ElectronAppError as e:
                     if self.verbose:
                         print(f"⚠️  Download failed: {e}")
-                        print("🔄 Falling back to bundled app...")
-                    app_path = self._fallback_to_bundled_app()
-                    use_downloaded = False
+                    
+                    # In production mode, don't fallback to bundled app
+                    # because it requires Node.js/electron which users might not have
+                    raise ElectronAppError(
+                        f"Failed to download Electron app and no bundled fallback available in production mode.\n"
+                        f"Please check your internet connection or use the web interface at your server URL.\n"
+                        f"Original error: {e}"
+                    )
             
             # Create temporary config file
             with tempfile.NamedTemporaryFile(
