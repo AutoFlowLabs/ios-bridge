@@ -432,6 +432,303 @@ Thanks to all contributors who made this release possible!
 
 ---
 
+## Release Methods
+
+There are two ways to create and publish a release: **Automated CI/CD** (recommended) and **Manual Release**.
+
+### 🤖 Method 1: Automated CI/CD Release (Recommended)
+
+The GitHub Actions workflow automatically builds, packages, and publishes everything when you push a git tag.
+
+#### Prerequisites Setup (One-Time)
+
+1. **Configure PyPI API Token:**
+   ```bash
+   # Go to: https://pypi.org/manage/account/token/
+   # Create new token with scope: "Entire account"
+   # Copy the token (starts with pypi-)
+   ```
+
+2. **Add GitHub Secrets:**
+   - Go to: `https://github.com/YOUR_USERNAME/ios-bridge/settings/secrets/actions`
+   - Add secret: `PYPI_API_TOKEN` = your PyPI token
+   - `GITHUB_TOKEN` is automatically provided
+
+3. **Update Repository URL** (if needed):
+   ```bash
+   # In ios_bridge_cli/app_manager.py, verify line 28:
+   GITHUB_REPO = "YOUR_USERNAME/ios-bridge"  # Should match your repo
+   ```
+
+#### Release Process
+
+1. **Bump Version:**
+   ```bash
+   cd ios-bridge-cli
+   
+   # Update version in pyproject.toml
+   sed -i '' 's/version = "1.0.0"/version = "1.0.1"/' pyproject.toml
+   
+   # Or manually edit:
+   # version = "1.0.1"
+   ```
+
+2. **Commit Changes:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git add .
+   git commit -m "Release v1.0.1: Auto-download functionality and enhanced documentation"
+   ```
+
+3. **Create and Push Release Tag:**
+   ```bash
+   # Create annotated tag with release notes
+   git tag -a v1.0.1 -m "Release v1.0.1
+
+   - Implemented auto-download functionality for Electron desktop app
+   - Updated documentation and installation guides  
+   - Enhanced user experience with automatic app management
+   - Cross-platform support with smart caching
+   - Fallback to bundled app for development mode"
+
+   # Push everything
+   git push origin main
+   git push origin v1.0.1
+   ```
+
+4. **Monitor the Build:**
+   - Go to: `https://github.com/YOUR_USERNAME/ios-bridge/actions`
+   - Watch the "Build and Release iOS Bridge CLI" workflow
+   - Should complete in ~15-20 minutes
+
+#### What Gets Created Automatically
+
+**GitHub Release Assets:**
+- `ios-bridge-desktop-mac-arm64.zip` (for auto-download)
+- `ios-bridge-desktop-mac-x64.zip` (for auto-download)
+- `ios-bridge-desktop-windows-x64.zip` (for auto-download)
+- `ios-bridge-desktop-linux-x64.zip` (for auto-download)
+- `ios_bridge_cli-1.0.1-py3-none-any.whl` (Python package)
+- `ios_bridge_cli-1.0.1.tar.gz` (Python source)
+- `checksums.txt` (verification)
+
+**PyPI Publication:**
+- Package automatically published to https://pypi.org/project/ios-bridge-cli/
+
+#### Alternative: Manual Trigger
+
+If you need to trigger without creating a tag:
+
+1. Go to: `https://github.com/YOUR_USERNAME/ios-bridge/actions`
+2. Select: "Build and Release iOS Bridge CLI"
+3. Click: "Run workflow"
+4. Enter version: `v1.0.1`
+5. Click: "Run workflow"
+
+#### Troubleshooting CI/CD
+
+**Build fails:**
+```bash
+# Check the Actions logs on GitHub
+# Common issues:
+# - Missing PYPI_API_TOKEN secret
+# - Node.js build errors (check electron_app/package.json)
+# - Python build errors (check pyproject.toml)
+```
+
+**PyPI upload fails:**
+```bash
+# Check if version already exists on PyPI
+# Increment version and try again
+sed -i '' 's/version = "1.0.1"/version = "1.0.2"/' pyproject.toml
+```
+
+---
+
+### 🔧 Method 2: Manual Release
+
+For developers who prefer manual control or need to debug the build process.
+
+#### Step 1: Prepare Environment
+
+```bash
+# Ensure you have all build tools
+pip install build twine
+npm install -g electron-builder
+
+# Verify tools
+python -m build --help
+twine --help
+electron-builder --help
+```
+
+#### Step 2: Build Python Package
+
+```bash
+cd ios-bridge-cli
+
+# Clean previous builds
+rm -rf dist/ build/ *.egg-info
+
+# Build Python packages
+python -m build
+
+# Verify packages
+twine check dist/*
+
+# Test install locally
+pip install dist/*.whl --force-reinstall
+ios-bridge --version
+```
+
+#### Step 3: Build Electron Apps
+
+```bash
+cd ios_bridge_cli/electron_app
+
+# Install dependencies
+npm install
+
+# Build for all platforms
+npm run build-mac     # macOS (creates DMG + ZIP)
+npm run build-win     # Windows (creates NSIS + Portable)  
+npm run build-linux   # Linux (creates AppImage + DEB + RPM)
+
+# Verify builds
+ls -la dist/
+```
+
+#### Step 4: Package for Auto-Download
+
+```bash
+cd dist
+
+# Create ZIP files with exact names expected by CLI
+zip -r ios-bridge-desktop-mac-arm64.zip "mac-arm64/iOS Bridge.app"
+zip -r ios-bridge-desktop-mac-x64.zip "mac-x64/iOS Bridge.app"
+zip -r ios-bridge-desktop-windows-x64.zip "win-unpacked"
+zip -r ios-bridge-desktop-linux-x64.zip "linux-unpacked"
+
+# Move to release directory
+mkdir -p ../../../dist/release/
+mv ios-bridge-desktop-*.zip ../../../dist/release/
+
+# Generate checksums
+cd ../../../dist/release/
+sha256sum *.zip > desktop-apps-checksums.txt
+```
+
+#### Step 5: Test Packages Locally
+
+```bash
+# Test Python package
+pip install dist/ios_bridge_cli-1.0.1-py3-none-any.whl --force-reinstall
+ios-bridge --help
+
+# Test desktop apps (extract and run one)
+cd dist/release/
+unzip ios-bridge-desktop-mac-arm64.zip
+open "mac-arm64/iOS Bridge.app"  # macOS
+# Or double-click the .exe/.AppImage on other platforms
+```
+
+#### Step 6: Publish to PyPI
+
+```bash
+# Upload to TestPyPI first (optional)
+twine upload --repository testpypi dist/ios_bridge_cli-1.0.1*
+
+# Test install from TestPyPI
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ios-bridge-cli
+
+# If everything works, upload to production PyPI
+twine upload dist/ios_bridge_cli-1.0.1*
+```
+
+#### Step 7: Create GitHub Release
+
+**Option A: Using GitHub CLI**
+```bash
+# Create release with all assets
+gh release create v1.0.1 \
+  --title "iOS Bridge CLI v1.0.1" \
+  --notes "Release notes here..." \
+  dist/ios_bridge_cli-1.0.1-py3-none-any.whl \
+  dist/ios_bridge_cli-1.0.1.tar.gz \
+  dist/release/ios-bridge-desktop-mac-arm64.zip \
+  dist/release/ios-bridge-desktop-mac-x64.zip \
+  dist/release/ios-bridge-desktop-windows-x64.zip \
+  dist/release/ios-bridge-desktop-linux-x64.zip \
+  dist/release/desktop-apps-checksums.txt
+```
+
+**Option B: Using GitHub Web UI**
+1. Go to: `https://github.com/YOUR_USERNAME/ios-bridge/releases`
+2. Click: "Create a new release"
+3. Tag version: `v1.0.1`
+4. Release title: `iOS Bridge CLI v1.0.1`
+5. Upload all files from `dist/` and `dist/release/`
+6. Write release notes
+7. Click: "Publish release"
+
+#### Step 8: Verify Release
+
+```bash
+# Test auto-download functionality
+cd /tmp
+mkdir test-release
+cd test-release
+
+# Create fresh environment
+python -m venv test-env
+source test-env/bin/activate
+
+# Install from PyPI
+pip install ios-bridge-cli
+
+# Test auto-download (should download from GitHub releases)
+ios-bridge desktop --help
+
+# Should show:
+# 🔍 iOS Bridge Desktop not found or outdated
+# 🏗️ Downloading iOS Bridge Desktop for macOS...
+# ✅ iOS Bridge Desktop installed successfully
+```
+
+#### Manual Release Checklist
+
+- [ ] Version bumped in `pyproject.toml`
+- [ ] Python package builds successfully
+- [ ] Electron apps build for all platforms
+- [ ] Auto-download ZIP files created with correct names
+- [ ] All packages tested locally
+- [ ] PyPI upload successful
+- [ ] GitHub release created with all assets
+- [ ] Auto-download functionality verified
+- [ ] Documentation updated
+
+---
+
+## Release Comparison
+
+| Feature | Automated CI/CD | Manual Release |
+|---------|----------------|----------------|
+| **Time Required** | 2 minutes setup | 30-60 minutes |
+| **Complexity** | Very Low | High |
+| **Error-Prone** | Low | High |
+| **Cross-Platform** | All platforms | Depends on your OS |
+| **Consistency** | Perfect | Manual variations |
+| **Best For** | Production releases | Debugging, learning |
+
+**Recommendation:** Use **Automated CI/CD** for all production releases. Use **Manual Release** only for:
+- Learning the build process
+- Debugging build issues  
+- One-off custom builds
+- When CI/CD is unavailable
+
+---
+
 ## Distribution Platforms
 
 ### 1. Package Managers
