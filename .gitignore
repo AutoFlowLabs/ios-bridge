@@ -20,3 +20,4 @@ ios-bridge-cli/ios_bridge_cli/electron_app/build/*
 */*.ipynb
 *.ipynb
 *.claude
+nativebridge-ios-poc.ipynb

@@ -15,8 +15,8 @@ This is the **most common use case** for iOS Bridge: developers want to stream a
 ## Quick Start Summary
 
 1. **Mac**: `ios-bridge start-server --host 0.0.0.0 --port 8000`
-2. **Client**: `ios-bridge connect http://[MAC-IP]:8000 --save`
-3. **Client**: `ios-bridge stream <session-id>`
+2. **Client Desktop App**: `ios-bridge connect http://[MAC-IP]:8000 --save` then `ios-bridge stream <session-id>`
+3. **Client Web Browser**: Open `http://[MAC-IP]:8000` directly (no CLI needed)
 
 ---
 
@@ -96,22 +96,34 @@ ios-bridge list
 ### Part 2: Windows/Linux Setup (Client Machines)
 
 #### Prerequisites
-- **Windows 10+** or **Linux** (Ubuntu 20.04+, Fedora 34+, etc.)
-- **Python 3.8+** installed
+- **Windows 10+** or **Linux** (Ubuntu 20.04+, Fedora 34+, etc.)  
 - **Network access** to the Mac server
+- **For Desktop App**: Python 3.8+ installed
+- **For Web Interface**: Modern web browser (Chrome, Firefox, Safari, Edge)
 
-#### Step 1: Install iOS Bridge CLI
+#### Step 1: Choose Access Method
+
+**Option A: Desktop App (Full CLI Features)**
 ```bash
 # Install the CLI
 pip install ios-bridge-cli
 
-# Verify installation
+# Verify installation  
 ios-bridge --version
 ```
 
-#### Step 2: Connect to Mac Server
+**Option B: Web Browser (Direct Access)**
+```bash
+# No installation needed!
+# Simply open your browser to: http://192.168.0.101:8000
+# (Replace 192.168.0.101 with your Mac's IP address)
+# You can skip to "Step 4" if using web interface only
+```
+
+#### Step 2: Connect to Mac Server (Desktop App Only)
 ```bash
 # Connect to Mac server (replace IP with your Mac's IP)
+# Skip this step if using web browser
 ios-bridge connect http://192.168.0.101:8000 --save
 
 # This command:
@@ -120,9 +132,10 @@ ios-bridge connect http://192.168.0.101:8000 --save
 # 3. Configures CLI to use remote server by default
 ```
 
-#### Step 3: Verify Connection
+#### Step 3: Verify Connection (Desktop App Only)
 ```bash
 # Check server status
+# Skip this step if using web browser
 ios-bridge server-status
 
 # Should show: "🌐 Checking remote iOS Bridge server: http://192.168.0.101:8000"
@@ -134,6 +147,8 @@ ios-bridge list
 ```
 
 #### Step 4: Stream iOS Simulator
+
+**Option A: Desktop App (Recommended)**
 ```bash
 # Stream a session in desktop app (auto-downloads desktop app)
 ios-bridge stream <session-id>
@@ -144,6 +159,17 @@ ios-bridge stream <session-id>
 # ████████████████████████████████████████ 25.4MB / 25.4MB
 # ✅ iOS Bridge Desktop installed successfully
 # 🚀 Starting iOS Bridge Desktop
+```
+
+**Option B: Web Interface**
+```bash
+# Access via web browser directly (no CLI needed)
+# Open in browser: http://192.168.0.101:8000
+# (Replace 192.168.0.101 with your Mac's IP)
+
+# Or use CLI with web-only mode
+ios-bridge stream <session-id> --web-only
+# Then open: http://localhost:8000 (redirects to Mac server)
 ```
 
 ---
@@ -157,10 +183,14 @@ ios-bridge stream <session-id>
 # Mac (shared server)
 ios-bridge start-server --host 0.0.0.0 --port 8000 --background
 
-# Each developer's machine
+# Each developer's machine (Option A: Desktop App)
 ios-bridge connect http://TEAM-MAC-IP:8000 --save
 ios-bridge create --device "iPhone 15 Pro"  # Creates on Mac
 ios-bridge stream SESSION-ID                # Streams to local desktop
+
+# Each developer's machine (Option B: Web Interface)
+# Simply open: http://TEAM-MAC-IP:8000 in browser
+# No CLI installation needed for basic streaming
 ```
 
 ### Scenario 2: CI/CD Testing
@@ -414,6 +444,26 @@ ios-bridge stream SESSION-ID [--quality high] [--fullscreen]
 ios-bridge screenshot SESSION-ID [--output FILE]
 ios-bridge info SESSION-ID
 ```
+
+---
+
+## Desktop App vs Web Interface Comparison
+
+| Feature | Desktop App | Web Interface |
+|---------|-------------|---------------|
+| **Installation** | Requires Python + CLI | No installation needed |
+| **Performance** | Native desktop performance | Browser-based, slightly slower |
+| **Features** | Full CLI features | Streaming and basic controls |
+| **Shortcuts** | Native keyboard shortcuts | Browser shortcuts |
+| **Session Management** | Create, list, terminate sessions | View and stream existing sessions |
+| **Screenshots** | Save to custom locations | Download via browser |
+| **Auto-updates** | Automatic with CLI updates | Always latest via browser |
+| **Offline Usage** | Works after first download | Requires active server connection |
+| **Multi-monitor** | Native window management | Browser tab/window management |
+
+**Recommendation**: 
+- **Desktop App**: For developers doing active development and testing
+- **Web Interface**: For quick demos, QA testing, or users who prefer browser-based tools
 
 ---
 
