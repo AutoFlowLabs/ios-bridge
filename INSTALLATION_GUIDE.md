@@ -1,32 +1,53 @@
 # iOS Bridge CLI Installation Guide
 
-Complete guide for installing and using the iOS Bridge CLI across all platforms.
+Complete guide for installing and using the iOS Bridge CLI with integrated desktop app across all platforms.
 
 ## Table of Contents
 
 1. [Quick Installation](#quick-installation)
-2. [Platform-Specific Instructions](#platform-specific-instructions)
-3. [Manual Installation](#manual-installation)
-4. [Development Installation](#development-installation)
-5. [Troubleshooting](#troubleshooting)
-6. [Uninstallation](#uninstallation)
+2. [Platform-Specific Instructions](#platform-specific-instructions) 
+3. [First Time Usage](#first-time-usage)
+4. [Advanced Installation](#advanced-installation)
+5. [Development Installation](#development-installation)
+6. [Troubleshooting](#troubleshooting)
+7. [Uninstallation](#uninstallation)
 
 ---
 
 ## Quick Installation
 
-### One-Command Install
+### ⚡ One-Command Install (Recommended)
 
 ```bash
-# Install from PyPI (Python package only)
 pip install ios-bridge-cli
-
-# For full installation with desktop app, see platform-specific instructions below
 ```
 
-### With Desktop App
+**That's it!** 🎉 
 
-Download the latest release from [GitHub Releases](https://github.com/your-org/ios-bridge/releases) and follow platform-specific instructions.
+The CLI includes:
+- ✅ Command-line interface for iOS device control
+- ✅ Auto-downloading desktop app (no additional setup needed)
+- ✅ All dependencies bundled
+- ✅ Cross-platform support (macOS/Windows/Linux)
+
+### First Launch
+
+```bash
+# Start with desktop interface (automatically downloads desktop app)
+ios-bridge desktop
+
+# Or start with web interface
+ios-bridge stream
+```
+
+**First time desktop usage will show:**
+```
+🔍 iOS Bridge Desktop not found or outdated
+🏗️ Downloading iOS Bridge Desktop for macOS...
+████████████████████████████████████████ 25.4MB / 25.4MB
+✅ iOS Bridge Desktop installed successfully
+🚀 Starting iOS Bridge Desktop
+```
 
 ---
 
@@ -35,441 +56,352 @@ Download the latest release from [GitHub Releases](https://github.com/your-org/i
 ### 🍎 macOS
 
 #### Prerequisites
-- macOS 10.15 (Catalina) or later
-- Python 3.8+ (recommended: [python.org](https://python.org) installer)
-- Xcode Command Line Tools: `xcode-select --install`
+- **macOS 10.15** (Catalina) or later
+- **Python 3.8+** (check with `python3 --version`)
+- **Xcode Command Line Tools**: `xcode-select --install`
 
-#### Installation Options
-
-**Option 1: Package Installer (Recommended)**
-1. Download `ios-bridge-cli-macos.tar.gz` from releases
-2. Extract: `tar -xzf ios-bridge-cli-macos.tar.gz`
-3. Run installer: `cd ios-bridge-cli-macos && chmod +x install.sh && ./install.sh`
-
-**Option 2: Homebrew (if available)**
+#### Installation
 ```bash
-# Add tap (when published)
-brew tap your-org/ios-bridge
-brew install ios-bridge-cli
-```
-
-**Option 3: Python + Manual Desktop App**
-```bash
-# Install CLI
+# Install Python CLI
 pip3 install ios-bridge-cli
 
-# Download and install desktop app
-# Drag iOS Bridge.app to Applications folder
+# First desktop app usage (auto-downloads)
+ios-bridge desktop
 ```
 
-#### Verification
-```bash
-ios-bridge --version
-open -a "iOS Bridge"  # Launch desktop app
-```
+**Note:** Desktop app will be cached in `~/Library/Caches/ios-bridge/` for future use.
 
----
+#### macOS Security
+When first launching the desktop app, macOS may show a security warning:
+
+1. **If you see "Cannot be opened because it is from an unidentified developer":**
+   - Go to **System Preferences → Security & Privacy**
+   - Click **"Allow"** next to the blocked app
+   - Or run: `xattr -d com.apple.quarantine ~/Library/Caches/ios-bridge/desktop-apps/*/iOS\ Bridge.app`
 
 ### 🪟 Windows
 
 #### Prerequisites
-- Windows 10 or later
-- Python 3.8+ ([python.org](https://python.org) - check "Add to PATH")
-- Microsoft Visual C++ Redistributable
+- **Windows 10** or later (Windows 11 recommended)
+- **Python 3.8+** from [python.org](https://python.org) 
+  - ✅ Make sure to check "Add Python to PATH" during installation
 
-#### Installation Options
-
-**Option 1: Package Installer (Recommended)**
-1. Download `ios-bridge-cli-windows.zip` from releases
-2. Extract the ZIP file
-3. Run `install.bat` as Administrator
-
-**Option 2: Python + Manual Desktop App**
-```cmd
-# Install CLI
+#### Installation
+```bash
+# Open Command Prompt or PowerShell
 pip install ios-bridge-cli
 
-# Download and run desktop app installer
-# Or extract portable version
+# First desktop app usage (auto-downloads)
+ios-bridge desktop
 ```
 
-#### Verification
-```cmd
-ios-bridge --version
-# Desktop app will be in Start Menu or run the .exe directly
-```
+**Note:** Desktop app will be cached in `%LOCALAPPDATA%/ios-bridge/cache/` for future use.
 
----
+#### Windows Defender
+Windows may scan the downloaded desktop app:
+- This is normal and safe
+- First launch may take extra time due to scanning
+- Consider adding the cache folder to Windows Defender exclusions for faster launches
 
 ### 🐧 Linux
 
 #### Prerequisites
-- Ubuntu 18.04+ / Debian 10+ / CentOS 8+ / Fedora 32+
-- Python 3.8+
-- Basic development tools
+- **Ubuntu 20.04+**, **Fedora 34+**, or equivalent
+- **Python 3.8+**: `sudo apt install python3 python3-pip` (Ubuntu)
 
-**Ubuntu/Debian:**
-```bash
-sudo apt update
-sudo apt install python3 python3-pip python3-venv build-essential
-```
-
-**CentOS/RHEL/Fedora:**
-```bash
-sudo dnf install python3 python3-pip python3-devel gcc gcc-c++
-# or on older systems: sudo yum install python3 python3-pip python3-devel gcc gcc-c++
-```
-
-#### Installation Options
-
-**Option 1: Package Installer (Recommended)**
-1. Download `ios-bridge-cli-linux.tar.gz` from releases
-2. Extract: `tar -xzf ios-bridge-cli-linux.tar.gz`
-3. Run installer: `cd ios-bridge-cli-linux && chmod +x install.sh && ./install.sh`
-
-**Option 2: Python + Manual Desktop App**
+#### Installation
 ```bash
 # Install CLI
 pip3 install ios-bridge-cli
 
-# Make AppImage executable and run
-chmod +x ios-bridge-desktop.AppImage
-./ios-bridge-desktop.AppImage
+# First desktop app usage (auto-downloads)
+ios-bridge desktop
 ```
 
-#### Verification
+**Note:** Desktop app will be cached in `~/.cache/ios-bridge/` for future use.
+
+#### Linux Permissions
+Make downloaded app executable (usually automatic):
 ```bash
-ios-bridge --version
-./ios-bridge-desktop.AppImage  # Or installed AppImage path
+chmod +x ~/.cache/ios-bridge/desktop-apps/*/ios-bridge-desktop
 ```
 
 ---
 
-## Manual Installation
+## First Time Usage
 
-### Python Package Only
-
+### 1. Connect iOS Device
 ```bash
-# Create virtual environment (recommended)
-python3 -m venv ios-bridge-env
-source ios-bridge-env/bin/activate  # Linux/macOS
-# or
-ios-bridge-env\Scripts\activate  # Windows
+# List available devices
+ios-bridge list
 
-# Install
-pip install ios-bridge-cli
-
-# Verify
-ios-bridge --help
+# Should show something like:
+# iPhone 15 Pro (17.1) - 00008110-001234567890ABCD
+# iPad Pro (17.1) - 00008020-001234567890EFGH
 ```
 
-### From Source
+### 2. Start Streaming
+
+**Desktop App (Recommended):**
+```bash
+ios-bridge desktop
+```
+
+**Web Interface:**
+```bash
+ios-bridge stream
+# Open browser to: http://localhost:8000
+```
+
+**Select specific device:**
+```bash
+ios-bridge desktop --device "iPhone 15 Pro"
+```
+
+### 3. Usage Examples
 
 ```bash
-# Clone repository
-git clone https://github.com/your-org/ios-bridge.git
-cd ios-bridge/ios-bridge-cli
+# Desktop mode with specific device and quality
+ios-bridge desktop --device "iPhone 15 Pro" --quality high
 
-# Install in development mode
-pip install -e .
+# Web mode on custom port
+ios-bridge stream --port 9000
 
-# Build desktop app (requires Node.js)
-cd ios_bridge_cli/electron_app
-npm install
-npm run build
+# Help and options
+ios-bridge --help
+ios-bridge desktop --help
+```
+
+---
+
+## Advanced Installation
+
+### Virtual Environment (Recommended for Development)
+
+```bash
+# Create isolated environment
+python3 -m venv ios-bridge-env
+source ios-bridge-env/bin/activate  # On Windows: ios-bridge-env\Scripts\activate
+
+# Install in virtual environment
+pip install ios-bridge-cli
+
+# Use as normal
+ios-bridge desktop
+```
+
+### Global Installation with pipx
+
+```bash
+# Install pipx if not available
+pip install pipx
+
+# Install iOS Bridge CLI globally
+pipx install ios-bridge-cli
+
+# Use from anywhere
+ios-bridge desktop
+```
+
+### Upgrade to Latest Version
+
+```bash
+# Upgrade CLI
+pip install --upgrade ios-bridge-cli
+
+# Desktop app will auto-update to match CLI version
+ios-bridge desktop  # Downloads new version if needed
 ```
 
 ---
 
 ## Development Installation
 
-### For Contributors
+For developers who want to contribute or modify the code:
 
+### From Source
 ```bash
-# Clone and setup development environment
-git clone https://github.com/your-org/ios-bridge.git
+# Clone repository
+git clone https://github.com/your-username/ios-bridge.git
 cd ios-bridge/ios-bridge-cli
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+# Install in development mode
+pip install -e .
 
-# Install with development dependencies
-pip install -e ".[dev]"
-
-# Install pre-commit hooks
-pre-commit install
-
-# Setup Electron development
+# Install Node.js dependencies for bundled Electron app
 cd ios_bridge_cli/electron_app
 npm install
 
-# Run in development mode
-npm run dev
+# Run in development mode (uses bundled source)
+ios-bridge desktop  # Automatically uses development mode
 ```
 
-### Building from Source
+### Development vs Production Behavior
 
-```bash
-# Build Python package
-python -m build
+**Development Mode (from source):**
+- Uses bundled Electron source code
+- Requires Node.js and npm
+- Enables live development
+- Auto-detected when running from source directory
 
-# Build Electron app for all platforms
-python build_and_package.py
-
-# Build for specific platform
-python build_and_package.py --platforms darwin win32 linux
-```
-
----
-
-## Configuration
-
-### First-Time Setup
-
-1. **Launch the application:**
-   ```bash
-   ios-bridge
-   ```
-
-2. **Configure server connection:**
-   ```bash
-   ios-bridge connect ws://your-server:8000
-   ```
-
-3. **Desktop app configuration:**
-   - Launch desktop app
-   - Enter server URL in connection dialog
-   - Save connection for future use
-
-### Environment Variables
-
-```bash
-# Server configuration
-export IOS_BRIDGE_SERVER_URL="ws://localhost:8000"
-export IOS_BRIDGE_API_KEY="your-api-key"
-
-# Desktop app settings
-export IOS_BRIDGE_WINDOW_WIDTH=1200
-export IOS_BRIDGE_WINDOW_HEIGHT=800
-export IOS_BRIDGE_LOG_LEVEL=INFO
-```
-
-### Configuration File
-
-Create `~/.config/ios-bridge/config.json`:
-```json
-{
-  "server_url": "ws://localhost:8000",
-  "auto_connect": true,
-  "window_settings": {
-    "width": 1200,
-    "height": 800,
-    "always_on_top": false
-  },
-  "streaming": {
-    "quality": "high",
-    "fps": 60,
-    "mode": "websocket"
-  }
-}
-```
-
----
-
-## Usage Examples
-
-### CLI Usage
-
-```bash
-# Show help
-ios-bridge --help
-
-# Connect to server
-ios-bridge connect ws://192.168.1.100:8000
-
-# List available sessions
-ios-bridge list-sessions
-
-# Connect to specific session
-ios-bridge connect-session abc123
-
-# Launch desktop app
-ios-bridge desktop
-```
-
-### Desktop App Usage
-
-1. **Launch app:** Click iOS Bridge icon or run executable
-2. **Connect:** Enter server URL (e.g., `ws://192.168.1.100:8000`)
-3. **Select session:** Choose from available iOS simulator sessions
-4. **Stream:** Interact with iOS simulator in real-time
-
-### Advanced Usage
-
-```bash
-# Custom quality settings
-ios-bridge connect ws://server:8000 --quality high --fps 60
-
-# WebRTC mode for lower latency
-ios-bridge connect ws://server:8000 --mode webrtc
-
-# Export session recording
-ios-bridge export-recording session_id output.mp4
-
-# Batch operations
-ios-bridge batch-install apps/*.ipa --session all
-```
+**Production Mode (from PyPI):**
+- Downloads pre-built desktop apps
+- No Node.js requirement
+- Cached for performance
+- Auto-updates with CLI version
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
+### Desktop App Download Issues
 
-#### 1. Python Installation Issues
-
-**Problem:** `ios-bridge: command not found`
+**Problem:** Desktop app fails to download
 ```bash
-# Check Python installation
-python3 --version
-pip3 --version
+# Check internet connection
+curl -I https://github.com
 
-# Add pip install location to PATH
-export PATH="$HOME/.local/bin:$PATH"  # Linux/macOS
-# or check Windows PATH includes Python Scripts directory
+# Clear cache and retry
+python3 -c "from ios_bridge_cli.app_manager import ElectronAppManager; ElectronAppManager().clear_cache()"
+ios-bridge desktop
+
+# Use verbose mode for debugging
+ios-bridge desktop --verbose
 ```
 
-#### 2. Desktop App Won't Launch
-
-**macOS:**
+**Problem:** "No Node.js found" error in development mode
 ```bash
-# Check security settings
-xattr -d com.apple.quarantine "/Applications/iOS Bridge.app"
-# or allow in System Preferences > Security & Privacy
+# Install Node.js from nodejs.org, then:
+cd ios_bridge_cli/electron_app
+npm install
 ```
 
-**Windows:**
-```cmd
-# Run as Administrator
-# Check Windows Defender exclusions
-# Verify Visual C++ Redistributable installed
+### iOS Device Connection Issues
+
+**Problem:** No devices found
+```bash
+# Check idb installation
+python3 -c "import subprocess; subprocess.run(['idb', 'list-targets'])"
+
+# Install idb if missing
+pip install fb-idb
+
+# Check iOS device connection
+idb list-targets
 ```
 
-**Linux:**
+**Problem:** Device not responding
 ```bash
-# Install additional dependencies
-sudo apt install libglib2.0-0 libgtk-3-0 libx11-xcb1 libxcb-dri3-0
+# Restart iOS device
+# Reconnect USB cable
+# Trust computer on iOS device when prompted
 
-# Check permissions
-chmod +x ios-bridge-desktop.AppImage
+# Check device status
+ios-bridge list --verbose
 ```
 
-#### 3. Connection Issues
+### Permission Issues
 
+**macOS:** Gatekeeper blocking app
 ```bash
-# Test server connectivity
-curl -I http://your-server:8000/health
-
-# Check firewall settings
-# Verify server is running
-# Check WebSocket support
+sudo xattr -r -d com.apple.quarantine ~/Library/Caches/ios-bridge/
 ```
 
-#### 4. Performance Issues
-
+**Linux:** Executable permissions
 ```bash
-# Lower quality settings
-ios-bridge connect ws://server:8000 --quality medium --fps 30
-
-# Try different streaming mode
-ios-bridge connect ws://server:8000 --mode websocket
-
-# Check system resources
-ios-bridge system-info
+chmod +x ~/.cache/ios-bridge/desktop-apps/*/ios-bridge-desktop
 ```
 
-### Log Files
+**Windows:** Antivirus blocking
+- Add iOS Bridge cache folder to antivirus exclusions
+- Temporarily disable real-time protection during first download
 
-**Locations:**
-- macOS: `~/Library/Logs/ios-bridge/`
-- Windows: `%APPDATA%/ios-bridge/logs/`
-- Linux: `~/.local/share/ios-bridge/logs/`
+### Cache Issues
 
-**Viewing logs:**
+**Clear all cached data:**
 ```bash
-# CLI logs
-ios-bridge --verbose
+# Clear desktop app cache
+python3 -c "from ios_bridge_cli.app_manager import ElectronAppManager; ElectronAppManager().clear_cache()"
 
-# Desktop app logs
-tail -f ~/Library/Logs/ios-bridge/main.log
+# Clear pip cache
+pip cache purge
+
+# Reinstall
+pip install --force-reinstall ios-bridge-cli
 ```
 
 ### Getting Help
 
-1. **Check documentation:** [GitHub Wiki](https://github.com/your-org/ios-bridge/wiki)
-2. **Search issues:** [GitHub Issues](https://github.com/your-org/ios-bridge/issues)
-3. **Report bugs:** Include logs, OS version, and steps to reproduce
-4. **Community support:** Join Discord/Slack community
+**Check app status:**
+```bash
+ios-bridge --version
+python3 -c "from ios_bridge_cli.app_manager import ElectronAppManager; print(ElectronAppManager().get_app_info())"
+```
+
+**Enable verbose logging:**
+```bash
+ios-bridge desktop --verbose
+ios-bridge stream --verbose
+```
+
+**Report issues:**
+- GitHub Issues: [https://github.com/your-username/ios-bridge/issues](https://github.com/your-username/ios-bridge/issues)
+- Include iOS Bridge version, platform, and error messages
+- Use `--verbose` flag and include full output
 
 ---
 
 ## Uninstallation
 
-### Python Package
+### Complete Removal
 
 ```bash
+# Uninstall CLI
 pip uninstall ios-bridge-cli
+
+# Remove cached desktop apps (optional)
+# macOS
+rm -rf ~/Library/Caches/ios-bridge/
+
+# Windows
+rmdir /s "%LOCALAPPDATA%\ios-bridge"
+
+# Linux
+rm -rf ~/.cache/ios-bridge/
 ```
 
-### Desktop Applications
+### Keep Desktop Apps (for reinstallation)
 
-**macOS:**
 ```bash
-# Remove application
-rm -rf "/Applications/iOS Bridge.app"
+# Only uninstall CLI, keep cached apps
+pip uninstall ios-bridge-cli
 
-# Remove user data
-rm -rf ~/Library/Application\ Support/ios-bridge
-rm -rf ~/Library/Logs/ios-bridge
-rm -rf ~/Library/Preferences/com.iosbridge.desktop.plist
-```
-
-**Windows:**
-```cmd
-# Uninstall via Control Panel > Programs
-# or manually delete installation directory
-
-# Remove user data
-rmdir /s "%APPDATA%\ios-bridge"
-```
-
-**Linux:**
-```bash
-# Remove AppImage
-rm ios-bridge-desktop.AppImage
-
-# Remove user data
-rm -rf ~/.local/share/ios-bridge
-rm -rf ~/.config/ios-bridge
+# Reinstalling will reuse cached desktop apps
+pip install ios-bridge-cli
 ```
 
 ---
 
-## Next Steps
+## FAQ
 
-After installation:
+**Q: Do I need Node.js installed?**
+A: No, not for normal usage. The CLI downloads pre-built desktop apps automatically.
 
-1. **Read the [Usage Guide](USAGE.md)** for detailed feature documentation
-2. **Check [Server Setup](../README.md#server-setup)** for backend configuration
-3. **Explore [Examples](examples/)** for integration patterns
-4. **Join the community** for support and updates
+**Q: How much disk space does it use?**
+A: CLI: ~5MB, Desktop app cache: ~25-30MB per platform, total: ~35MB
+
+**Q: Can I use it offline?**
+A: Yes, after first download. Desktop apps are cached locally.
+
+**Q: How do I update?**
+A: `pip install --upgrade ios-bridge-cli` - desktop apps auto-update to match.
+
+**Q: Does it work with iOS Simulator?**
+A: Yes, it works with both physical devices and iOS Simulator.
+
+**Q: Is it safe?**
+A: Yes, it's open source. Desktop apps are signed and distributed via GitHub releases.
 
 ---
 
-## Support
-
-- 📚 **Documentation:** [GitHub Wiki](https://github.com/your-org/ios-bridge/wiki)
-- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/your-org/ios-bridge/issues)
-- 💬 **Community:** [Discord](https://discord.gg/ios-bridge) | [Slack](https://ios-bridge.slack.com)
-- 📧 **Email:** support@iosbridge.dev
+**Need help?** Check our [GitHub Issues](https://github.com/your-username/ios-bridge/issues) or start with `ios-bridge --help`
