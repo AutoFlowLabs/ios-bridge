@@ -33,9 +33,26 @@ pip install ios-bridge-cli
 - ✅ Desktop streaming
 - ✅ Session management commands
 
-## Usage
+## Quick Start
 
-### Remote Server Connection (All Platforms)
+### Cross-Platform Setup (Most Common)
+Run iOS simulators on Mac, stream to Windows/Linux:
+
+**Mac (Server):**
+```bash
+ios-bridge start-server --host 0.0.0.0 --port 8000
+```
+
+**Windows/Linux (Client):**
+```bash
+ios-bridge connect http://[MAC-IP]:8000 --save
+ios-bridge list
+ios-bridge stream <session-id>
+```
+
+📖 **[Complete Cross-Platform Setup Guide](../CROSS_PLATFORM_SETUP.md)**
+
+### Remote Server Connection
 ```bash
 # Connect to your deployed iOS Bridge server
 ios-bridge connect https://ios-bridge.yourcompany.com --save

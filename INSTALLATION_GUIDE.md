@@ -5,12 +5,13 @@ Complete guide for installing and using the iOS Bridge CLI with integrated deskt
 ## Table of Contents
 
 1. [Quick Installation](#quick-installation)
-2. [Platform-Specific Instructions](#platform-specific-instructions) 
-3. [First Time Usage](#first-time-usage)
-4. [Advanced Installation](#advanced-installation)
-5. [Development Installation](#development-installation)
-6. [Troubleshooting](#troubleshooting)
-7. [Uninstallation](#uninstallation)
+2. [Cross-Platform Setup (Most Common)](#cross-platform-setup-most-common)
+3. [Platform-Specific Instructions](#platform-specific-instructions) 
+4. [First Time Usage](#first-time-usage)
+5. [Advanced Installation](#advanced-installation)
+6. [Development Installation](#development-installation)
+7. [Troubleshooting](#troubleshooting)
+8. [Uninstallation](#uninstallation)
 
 ---
 
@@ -48,6 +49,34 @@ ios-bridge stream <session-id>
 ✅ iOS Bridge Desktop installed successfully
 🚀 Starting iOS Bridge Desktop
 ```
+
+---
+
+## Cross-Platform Setup (Most Common)
+
+**🎯 Primary Use Case**: Stream iOS simulators from Mac to Windows/Linux machines
+
+Since iOS simulators only run on macOS, most users want to:
+- **Mac**: Run iOS simulators and iOS Bridge server
+- **Windows/Linux**: Connect remotely with full desktop streaming
+
+### Quick Setup
+```bash
+# On Mac (Server)
+pip install ios-bridge-cli
+ios-bridge start-server --host 0.0.0.0 --port 8000
+
+# Get Mac IP: ifconfig | grep "inet 192.168"
+# Example: 192.168.0.101
+
+# On Windows/Linux (Client)  
+pip install ios-bridge-cli
+ios-bridge connect http://192.168.0.101:8000 --save
+ios-bridge list
+ios-bridge stream <session-id>  # Auto-downloads desktop app
+```
+
+📖 **[Complete Cross-Platform Setup Guide](../CROSS_PLATFORM_SETUP.md)** - Detailed networking, troubleshooting, and advanced configuration.
 
 ---
 
