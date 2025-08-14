@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
     
     cleanup()
 
-app = FastAPI(title="iOS Remote Control", version="1.0.1", lifespan=lifespan)
+app = FastAPI(title="iOS Remote Control", version="1.0.0", lifespan=lifespan)
 
 # Templates
 templates = Jinja2Templates(directory="templates")

@@ -9,7 +9,12 @@ on:
       version:
         description: 'Release version (e.g., v1.0.0)'
         required: true
-        default: 'v1.0.1'
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
 
 jobs:
   build-python:
@@ -63,6 +68,7 @@ jobs:
           npm run build-mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -92,6 +98,8 @@ jobs:
         run: |
           cd ios-bridge-cli/ios_bridge_cli/electron_app
           npm run build-win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -121,6 +129,8 @@ jobs:
         run: |
           cd ios-bridge-cli/ios_bridge_cli/electron_app
           npm run build-linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
