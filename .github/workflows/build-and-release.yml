@@ -9,7 +9,7 @@ on:
       version:
         description: 'Release version (e.g., v1.0.0)'
         required: true
-        default: 'v1.0.0'
+        default: 'v1.0.1'
 
 jobs:
   build-python:
@@ -148,15 +148,35 @@ jobs:
           mkdir -p release/{macos,windows,linux}
           mkdir -p release/python
       
-      - name: Organize release files
+      - name: Package Electron apps for auto-download
         run: |
           # Copy Python package
           cp python-package/* release/python/
           
-          # Copy Electron apps
-          cp -r electron-macos/* release/macos/ 2>/dev/null || true
-          cp -r electron-windows/* release/windows/ 2>/dev/null || true
-          cp -r electron-linux/* release/linux/ 2>/dev/null || true
+          # Package Electron apps with exact names expected by CLI auto-download
+          cd electron-macos 2>/dev/null && {
+            if [ -d "mac-arm64" ]; then
+              zip -r ../release/ios-bridge-desktop-mac-arm64.zip "mac-arm64/iOS Bridge.app"
+            fi
+            if [ -d "mac-x64" ]; then
+              zip -r ../release/ios-bridge-desktop-mac-x64.zip "mac-x64/iOS Bridge.app"  
+            fi
+            cd ..
+          } || true
+          
+          cd electron-windows 2>/dev/null && {
+            if [ -d "win-unpacked" ]; then
+              zip -r ../release/ios-bridge-desktop-windows-x64.zip "win-unpacked"
+            fi
+            cd ..
+          } || true
+          
+          cd electron-linux 2>/dev/null && {
+            if [ -d "linux-unpacked" ]; then
+              zip -r ../release/ios-bridge-desktop-linux-x64.zip "linux-unpacked"
+            fi
+            cd ..
+          } || true
       
       - name: Create installer scripts
         run: |
@@ -334,12 +354,15 @@ jobs:
       
       - name: Upload Release Assets
         run: |
-          # Upload platform packages
-          gh release upload ${{ github.ref }} release/ios-bridge-cli-macos.tar.gz
-          gh release upload ${{ github.ref }} release/ios-bridge-cli-windows.zip
-          gh release upload ${{ github.ref }} release/ios-bridge-cli-linux.tar.gz
-          gh release upload ${{ github.ref }} release/ios-bridge-cli-python.tar.gz
-          gh release upload ${{ github.ref }} release/checksums.txt
+          # Upload auto-download Electron app ZIPs (required by CLI)
+          gh release upload ${{ github.ref }} release/ios-bridge-desktop-*.zip || true
+          
+          # Upload traditional platform packages  
+          gh release upload ${{ github.ref }} release/ios-bridge-cli-macos.tar.gz || true
+          gh release upload ${{ github.ref }} release/ios-bridge-cli-windows.zip || true
+          gh release upload ${{ github.ref }} release/ios-bridge-cli-linux.tar.gz || true
+          gh release upload ${{ github.ref }} release/ios-bridge-cli-python.tar.gz || true
+          gh release upload ${{ github.ref }} release/checksums.txt || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -8,7 +8,7 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name="ios-bridge-cli",
-    version="1.0.0",
+    version="1.0.1",
     description="Desktop streaming client for iOS Bridge simulator sessions",
     long_description=long_description,
     long_description_content_type='text/markdown',
