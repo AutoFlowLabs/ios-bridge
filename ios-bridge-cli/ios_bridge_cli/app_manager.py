@@ -8,6 +8,7 @@ import json
 import tempfile
 import shutil
 import signal
+from packaging import version
 import platform
 from typing import Dict, Optional, Any
 from pathlib import Path
@@ -196,16 +197,32 @@ class ElectronAppManager:
             if self.verbose:
                 print(f"🔍 Read version from file: '{cached_version}'")
             
-            # Allow any valid version (don't force exact CLI version match)
-            # This prevents re-downloading when CLI version != app version
-            if cached_version and len(cached_version.split('.')) >= 2:
-                if self.verbose:
-                    print(f"✅ Found valid app version: {cached_version}")
-                return True
-            else:
+            # Check if we have a valid version and if it's up to date
+            if not cached_version or len(cached_version.split('.')) < 2:
                 if self.verbose:
                     print(f"🔍 Invalid version format: '{cached_version}'")
-            return False
+                return False
+            
+            # Check if there's a newer version available
+            try:
+                latest_release = self._get_latest_release()
+                latest_version = latest_release.get("tag_name", f"v{self.current_version}").lstrip("v")
+                
+                if version.parse(cached_version) < version.parse(latest_version):
+                    if self.verbose:
+                        print(f"🔄 App version {cached_version} is outdated. Latest: {latest_version}")
+                    return False
+                
+                if self.verbose:
+                    print(f"✅ Found valid app version: {cached_version} (latest: {latest_version})")
+                return True
+                
+            except Exception as e:
+                if self.verbose:
+                    print(f"⚠️ Could not check for updates: {e}")
+                    print(f"✅ Using cached app version: {cached_version}")
+                # If we can't check for updates, use the cached version
+                return True
         except Exception as e:
             if self.verbose:
                 print(f"🔍 Could not read version file: {e}")
