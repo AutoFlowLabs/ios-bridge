@@ -45,13 +45,18 @@ A powerful Python CLI with integrated Electron desktop application providing nat
 
 **Quick Start:**
 ```bash
-# Install and create an iOS session
+# Install the CLI
 pip install ios-bridge-cli
-ios-bridge create "iPhone 15 Pro" "17.0" --wait
 
-# Stream to desktop app
+# On macOS (local server + client)
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
+ios-bridge stream
+
+# On Windows/Linux (remote client - requires Mac server)
+ios-bridge connect http://MAC-IP:8000 --save
 ios-bridge stream
 ```
+*Note: Server requires macOS + Xcode. Windows/Linux are remote clients only.*
 
 **Perfect For:**
 - Individual developers wanting desktop iOS simulator access
@@ -113,14 +118,32 @@ A modern web interface that provides iOS simulator control directly in your brow
 
 ### 1. For Individual Developers (CLI + Desktop App)
 
+**On macOS (Local Server + Client):**
 ```bash
 # Install the CLI
 pip install ios-bridge-cli
 
-# Create and stream an iOS session
-ios-bridge create "iPhone 15 Pro" "17.0" --wait
+# Create and stream an iOS session (server starts automatically)
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
 ios-bridge stream
 ```
+
+**On Windows/Linux (Remote Client Only):**
+```bash
+# Install the CLI
+pip install ios-bridge-cli
+
+# Connect to Mac server (replace MAC-IP with actual Mac IP address)
+ios-bridge connect http://MAC-IP:8000 --save
+
+# Create session via remote server
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
+
+# Stream from remote server
+ios-bridge stream
+```
+
+> **⚠️ Important**: iOS Bridge server requires macOS + Xcode for iOS Simulator access. Windows and Linux can only run as remote clients connecting to a Mac server.
 
 ### 2. For Teams (Server + Web Interface)
 
