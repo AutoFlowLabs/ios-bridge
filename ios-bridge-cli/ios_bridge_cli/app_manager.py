@@ -530,8 +530,10 @@ class ElectronAppManager:
         system = platform.system()
         
         if system == "Darwin":
-            # macOS .app bundle
-            return ["open", str(app_path), "--args", "--config", config_file]
+            # macOS .app bundle - execute the binary directly instead of using 'open'
+            # This ensures proper argument passing like on Linux
+            binary_path = app_path / "Contents" / "MacOS" / "iOS Bridge"
+            return [str(binary_path), "--config", config_file]
         elif system == "Windows":
             # Windows .exe
             return [str(app_path), "--config", config_file]

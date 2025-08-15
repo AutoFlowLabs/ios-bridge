@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: ios-bridge-cli
-Version: 1.0.4
+Version: 1.0.5
 Summary: Desktop streaming client for iOS Bridge simulator sessions with Electron app integration
 Home-page: https://github.com/AutoFlowLabs/ios-bridge-cli
 Author: iOS Bridge Team
@@ -48,18 +48,18 @@ Dynamic: requires-python
 
 # iOS Bridge CLI
 
-A Python-based command-line tool for streaming and controlling iOS simulator sessions from your desktop, similar to how scrcpy works for Android devices.
+**Stream and control iOS simulators like a desktop app** - The macOS equivalent of `scrcpy` for iOS development.
 
-## Features
+iOS Bridge CLI lets you stream iOS simulator sessions to any device with a beautiful desktop interface. Perfect for cross-platform development teams, remote work, and testing iOS apps from Windows/Linux machines.
 
-- 🖥️ **Desktop streaming** of iOS simulator sessions
-- 🎮 **Touch and keyboard** input control  
-- 📱 **Device controls** (Home, Screenshot, Device Info)
-- 🔌 **WebSocket-based** real-time streaming
-- 🚀 **Easy installation** via pip
-- 💻 **Cross-platform** Electron-based UI
-- 🌐 **Remote server** support (Windows/Linux/macOS)
-- 🖥️ **Local server** management (macOS only)
+## What iOS Bridge CLI Does
+
+🖥️ **Desktop Streaming** - View iOS simulators in a native desktop window  
+🎮 **Touch & Keyboard Control** - Click, tap, type, and gesture naturally  
+🌐 **Cross-Platform Client** - Stream from Mac to Windows, Linux, or other Macs  
+📱 **Real Device Experience** - Full touch controls, home button, screenshots  
+🚀 **Zero Configuration** - Works out of the box with automatic server management  
+⚡ **High Performance** - WebRTC streaming with ultra-low latency
 
 ## Installation
 
@@ -67,133 +67,245 @@ A Python-based command-line tool for streaming and controlling iOS simulator ses
 pip install ios-bridge-cli
 ```
 
-## Platform Support
-
-### macOS (Full Functionality)
-- ✅ Local server management
-- ✅ Remote client connections
-- ✅ Desktop streaming
-- ✅ All CLI commands
-
-### Windows/Linux (Remote Client Only)
-- ❌ Local server (requires macOS + Xcode)
-- ✅ Remote client connections  
-- ✅ Desktop streaming
-- ✅ Session management commands
+**Requirements**: macOS (for server), Python 3.8+, Xcode (for iOS simulators)
 
 ## Quick Start
 
-### Cross-Platform Setup (Most Common)
-Run iOS simulators on Mac, stream to Windows/Linux:
+### 1. Create and Stream an iOS Session
 
-**Mac (Server):**
 ```bash
-ios-bridge start-server --host 0.0.0.0 --port 8000
+# Create an iPhone simulator
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
+
+# Stream it to desktop
+ios-bridge stream
 ```
 
-**Windows/Linux (Client):**
+That's it! A desktop window opens with your iOS simulator ready for interaction.
+
+### 2. Cross-Platform Setup (Mac Server → Windows/Linux Client)
+
+**On Mac (Server):**
 ```bash
-ios-bridge connect http://[MAC-IP]:8000 --save
+# Start the server for remote access
+ios-bridge start-server --host 0.0.0.0
+
+# Create and get session ID
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
+ios-bridge list  # Copy the session ID
+```
+
+**On Windows/Linux (Client with Full Features):**
+```bash
+# Connect to your Mac server
+ios-bridge connect http://YOUR-MAC-IP:8000 --save
+
+# Full session management capabilities
+ios-bridge create "iPhone 15 Pro" "18.2" --wait  # Create sessions
+ios-bridge list                                   # List all sessions
+ios-bridge stream                                 # Stream (auto-detects session)
+ios-bridge terminate <session-id>                # Terminate sessions
+ios-bridge info <session-id>                     # Get session details
+```
+
+> **✨ Important**: Windows and Linux clients have **complete feature parity** with macOS when connected to a Mac server. You can create, manage, stream, and control iOS sessions exactly like on Mac - the only requirement is the initial server connection.
+
+### 3. Web Interface (Browser Streaming)
+
+```bash
+# Stream in browser instead of desktop app
+ios-bridge stream <session-id> --web-only
+
+# Then open: http://localhost:8000/web/<session-id>
+```
+
+## Core Commands
+
+### Session Management
+```bash
+# List available device types
+ios-bridge devices
+
+# Create new simulator session
+ios-bridge create "iPhone 14 Pro" "16.0" --wait
+
+# List active sessions
 ios-bridge list
-ios-bridge stream <session-id>
+
+# Get session details
+ios-bridge info <session-id>
+
+# Terminate session
+ios-bridge terminate <session-id>
 ```
 
-📖 **[Complete Cross-Platform Setup Guide](../CROSS_PLATFORM_SETUP.md)**
-
-### Remote Server Connection
+### Streaming & Control
 ```bash
-# Connect to your deployed iOS Bridge server
-ios-bridge connect https://ios-bridge.yourcompany.com --save
+# Stream session (auto-detects if only one session)
+ios-bridge stream
+
+# Stream specific session
+ios-bridge stream <session-id>
+
+# Stream with quality settings
+ios-bridge stream <session-id> --quality ultra --fullscreen
+
+# Take screenshot
+ios-bridge screenshot --output screenshot.png
+```
+
+### Server Management
+```bash
+# Start server (macOS only)
+ios-bridge start-server
+
+# Start server in background
+ios-bridge start-server --background --port 9000
+
+# Check server status
+ios-bridge server-status
+
+# Stop server
+ios-bridge kill-server
+```
+
+### Remote Connection
+```bash
+# Connect to remote server and save
+ios-bridge connect https://ios-bridge.company.com --save
 
 # Test connection
 ios-bridge server-status
 
 # Use all commands with remote server
 ios-bridge devices
-ios-bridge create "iPhone 14 Pro" "18.2" --wait
-ios-bridge stream <session_id>
+ios-bridge create "iPhone 14" "18.2"
 ```
 
-### Local Server Management (macOS Only)
+## Desktop Controls
+
+- **Mouse**: Click and drag for touch input
+- **Keyboard**: Type directly into the simulator
+- **F1**: Home button
+- **F2**: Screenshot  
+- **F3**: Device info
+- **F4**: Toggle keyboard
+- **F11**: Toggle fullscreen
+- **Ctrl+C**: Close and exit
+
+## Platform Support
+
+| Platform | Local Server | Remote Client | Desktop Streaming |
+|----------|:------------:|:-------------:|:-----------------:|
+| **macOS** | ✅ Full | ✅ Full | ✅ Native App |
+| **Windows** | ❌ | ✅ Full | ✅ Native App |
+| **Linux** | ❌ | ✅ Full | ✅ Native App |
+
+*Local server requires macOS + Xcode for iOS simulator access*
+
+## Advanced Usage
+
+### Quality Settings
 ```bash
-# Start the iOS Bridge server (auto-detects server location)
-ios-bridge start-server
+# Ultra quality (best for local network)
+ios-bridge stream --quality ultra
 
-# Start server in background
-ios-bridge start-server --background
+# Low quality (best for slow connections)  
+ios-bridge stream --quality low
+```
 
-# Start server on custom port
-ios-bridge start-server --port 9000
+### Server Options
+```bash
+# Custom server host/port
+ios-bridge start-server --host 192.168.1.100 --port 9000
 
+# Background server with custom settings
+ios-bridge start-server --background --host 0.0.0.0 --port 8080
+```
+
+### Web Interface Features
+- 🌐 No desktop app installation required
+- 📱 Mobile-friendly interface
+- 🔗 Shareable URLs for team collaboration
+- 🚀 WebRTC streaming option
+
+## How It Works
+
+```
+┌─────────────────┐    HTTP/WebSocket    ┌─────────────────┐    
+│   iOS Bridge    │ ←──────────────────→ │  Desktop Client │    
+│     Server      │                      │   (Windows/     │    
+│                 │                      │   Linux/Mac)    │    
+│ • iOS Simulator │                      │                 │    
+│ • Session Mgmt  │                      │ • Video Stream  │    
+│ • WebRTC/WS API │                      │ • Touch Input   │    
+│   (macOS Only)  │                      │ • Native UI     │    
+└─────────────────┘                      └─────────────────┘    
+```
+
+The server runs on macOS (where iOS simulators are available) and streams to desktop clients on any platform.
+
+## Common Workflows
+
+### iOS Development Team
+1. **QA Team**: Run server on Mac mini, stream to Windows/Linux machines
+2. **Remote Work**: Develop on Mac, test from anywhere with web interface  
+3. **Team Reviews**: Share session URLs for collaborative testing
+
+### Individual Developer
+1. **Multi-Monitor Setup**: Stream simulator to second monitor
+2. **Screen Recording**: Use desktop apps like OBS to record iOS interactions
+3. **Cross-Platform Testing**: Test iOS app while working on Windows/Linux
+
+## Troubleshooting
+
+**"No sessions available"**
+```bash
+# Check if sessions exist
+ios-bridge list
+
+# Create a new session
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
+```
+
+**Connection errors**
+```bash
 # Check server status
 ios-bridge server-status
 
-# Stop the server
+# Restart server if needed
 ios-bridge kill-server
-
-# Force stop all server processes
-ios-bridge kill-server --force --all
+ios-bridge start-server
 ```
 
-### Session Management
+**Desktop app won't start**
+- Ensure server is running first: `ios-bridge start-server`
+- Try web interface: `ios-bridge stream --web-only`
+- Check for port conflicts: `ios-bridge start-server --port 9000`
+
+## Development
+
+For development documentation, see:
+- [Desktop App Development Guide](ios_bridge_cli/electron_app/DEVELOPMENT.md)
+- [CLI Development Setup](ios_bridge_cli/electron_app/DEV-COMMANDS.md)
+
+### Quick Development Setup
 ```bash
-# List available device types and iOS versions
-ios-bridge devices
+# CLI development
+git clone <repo-url>
+cd ios-bridge-cli
+pip install -e .
 
-# Create a new iOS simulator session
-ios-bridge create "iPhone 14 Pro" "16.0" --wait
-
-# List active sessions
-ios-bridge list
-
-# Get session information
-ios-bridge info <session_id>
-
-# Terminate a session
-ios-bridge terminate <session_id>
-```
-
-### Streaming and Control
-```bash
-# Stream an existing session in desktop window
-ios-bridge stream <session_id>
-
-# Stream with quality settings
-ios-bridge stream <session_id> --quality ultra --fullscreen
-
-# Take screenshot
-ios-bridge screenshot <session_id> --output screenshot.png
-```
-
-**Note:** The `--server` option is still available if you need to connect to a remote server, but it defaults to `http://localhost:8000` when using the local server commands.
-
-## Controls
-
-- **Mouse**: Click and drag for touch input
-- **Keyboard**: Type directly into the device
-- **Ctrl+C**: Close streaming window and exit
-- **F1**: Home button
-- **F2**: Take screenshot
-- **F3**: Show device info
-
-## Requirements
-
-- macOS (for iOS Bridge server)
-- Python 3.8+
-- Running iOS Bridge server instance
-
-## Architecture
-
-```
-┌─────────────────┐    HTTP/WS     ┌─────────────────┐    IPC    ┌─────────────────┐
-│   Python CLI    │ ←─────────────→ │  iOS Bridge     │           │  Electron App   │
-│                 │                 │    Server       │           │                 │
-│ • CLI parsing   │                 │                 │           │ • Video render  │
-│ • API client    │                 │ • Session mgmt  │ ←────────→ │ • Touch input   │
-│ • Process mgmt  │                 │ • WebSockets    │           │ • UI controls   │
-└─────────────────┘                 └─────────────────┘           └─────────────────┘
+# Desktop app development  
+cd ios_bridge_cli/electron_app
+npm install
+npm run dev
 ```
 
 ## License
 
-MIT License
+MIT License - see LICENSE file for details
+
+---
+
+**Getting Started**: `pip install ios-bridge-cli && ios-bridge start-server && ios-bridge create "iPhone 15 Pro" "18.2" --wait && ios-bridge stream`
