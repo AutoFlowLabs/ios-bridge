@@ -235,38 +235,270 @@ npm run dev
 
 ### REST Endpoints
 
+#### Session Management
 ```bash
+# Core Session Operations
+GET    /api/sessions/configurations      # Get available device types and iOS versions
+POST   /api/sessions/create              # Create new simulator session
+GET    /api/sessions/                    # List all active sessions
+GET    /api/sessions/{id}                # Get detailed session information
+DELETE /api/sessions/{id}                # Delete simulator session
+DELETE /api/sessions/                    # Delete all simulator sessions
+
 # Session Management
-GET    /api/sessions/                    # List all sessions
-POST   /api/sessions/create              # Create new session
-GET    /api/sessions/{id}                # Get session details
-DELETE /api/sessions/{id}                # Delete session
+GET    /api/sessions/refresh             # Refresh session states
+POST   /api/sessions/recover-orphaned    # Recover orphaned simulators
+POST   /api/sessions/cleanup             # Clean up old storage files
+GET    /api/sessions/storage/info        # Get session storage information
+```
 
-# App Management  
-POST   /api/sessions/{id}/apps/install   # Install IPA
-GET    /api/sessions/{id}/apps           # List installed apps
-POST   /api/sessions/{id}/apps/{bundle}/launch   # Launch app
+#### App Management
+```bash
+# App Installation and Control
+POST   /api/sessions/{id}/apps/install           # Install IPA/ZIP app
+POST   /api/sessions/{id}/apps/install-and-launch # Install and launch immediately
+GET    /api/sessions/{id}/apps                   # List installed apps
+POST   /api/sessions/{id}/apps/{bundle}/launch   # Launch specific app
+POST   /api/sessions/{id}/apps/{bundle}/terminate # Terminate specific app
+DELETE /api/sessions/{id}/apps/{bundle}          # Uninstall app
+```
 
-# Recording
-POST   /api/sessions/{id}/recording/start # Start recording
-POST   /api/sessions/{id}/recording/stop  # Stop and download
+#### Device Controls
+```bash
+# Device Interaction
+POST   /api/sessions/{id}/screenshot/download    # Take and download screenshot
+GET    /api/sessions/{id}/screenshot             # Take screenshot (return as response)
+POST   /api/sessions/{id}/orientation            # Change simulator orientation
+POST   /api/sessions/{id}/url/open               # Open URL on simulator
+GET    /api/sessions/{id}/url/schemes            # Get supported URL schemes
+```
+
+#### Location Services
+```bash
+# GPS and Location
+POST   /api/sessions/{id}/location/set           # Set custom GPS coordinates
+POST   /api/sessions/{id}/location/clear         # Clear mock location
+GET    /api/sessions/{id}/location/presets       # Get predefined locations
+POST   /api/sessions/{id}/location/set-predefined # Set predefined location
+```
+
+#### Media and File Management
+```bash
+# Media Operations
+POST   /api/sessions/{id}/media/photos/add       # Add photos to simulator
+POST   /api/sessions/{id}/media/videos/add       # Add videos to simulator
+GET    /api/sessions/{id}/media/info             # Get supported media formats
+
+# File Operations
+POST   /api/sessions/{id}/files/push             # Push file to simulator
+POST   /api/sessions/{id}/files/pull             # Pull file from simulator
+GET    /api/sessions/{id}/files/app-container    # Get app container path
+```
+
+#### Logging and Debugging
+```bash
+# Logging
+GET    /api/sessions/{id}/logs                   # Get recent simulator logs
+POST   /api/sessions/{id}/logs/clear             # Clear simulator logs
+GET    /api/sessions/{id}/logs/processes         # Get list of logging processes
+
+# Debug Endpoints
+GET    /debug/screenshot/{id}                    # Debug screenshot capture
+GET    /debug/tap/{id}/{x}/{y}                   # Debug tap action
+GET    /debug/home/{id}                          # Debug home button
+```
+
+#### Recording
+```bash
+# Video Recording
+POST   /api/sessions/{id}/recording/start        # Start video recording
+POST   /api/sessions/{id}/recording/stop         # Stop recording and download
+GET    /api/sessions/{id}/recording/status       # Get recording status
+POST   /api/sessions/cleanup-recordings          # Emergency cleanup all recordings
+```
+
+#### System and Status
+```bash
+# Health and Status
+GET    /health                                   # Health check with stats
+GET    /stats                                    # Detailed connection stats
+GET    /status/{id}                              # Get session status
+GET    /webrtc/quality/{id}/{quality}            # Set WebRTC quality (low/medium/high/ultra)
 ```
 
 ### WebSocket Endpoints
 
+#### Control WebSocket (`/ws/{session-id}/control`)
 ```javascript
-// Control WebSocket
-ws://localhost:8000/ws/{session-id}/control
+// Touch Controls
+controlSocket.send(JSON.stringify({
+    "t": "tap",
+    "x": 195,
+    "y": 422
+}));
 
-// Video Streaming
-ws://localhost:8000/ws/{session-id}/video
+// Swipe Gestures
+controlSocket.send(JSON.stringify({
+    "t": "swipe",
+    "start_x": 100,
+    "start_y": 400,
+    "end_x": 300,
+    "end_y": 400,
+    "duration": 0.2
+}));
 
-// WebRTC Streaming
-ws://localhost:8000/ws/{session-id}/webrtc
+// Hardware Buttons
+controlSocket.send(JSON.stringify({
+    "t": "button",
+    "button": "home" // home|lock|siri|side-button|apple-pay
+}));
 
-// Screenshots
-ws://localhost:8000/ws/{session-id}/screenshot
+// Text Input
+controlSocket.send(JSON.stringify({
+    "t": "text",
+    "text": "Hello World"
+}));
+
+// Individual Key Presses
+controlSocket.send(JSON.stringify({
+    "t": "key",
+    "key": "RETURN", // RETURN|SPACE|DELETE|etc
+    "duration": 0.1
+}));
 ```
+
+#### Video Streaming WebSocket (`/ws/{session-id}/video`)
+```javascript
+// Real-time video frames with metadata
+videoSocket.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    // data.frame: base64 encoded image
+    // data.width, data.height: frame dimensions
+    // data.fps, data.timestamp: performance info
+};
+```
+
+#### WebRTC WebSocket (`/ws/{session-id}/webrtc`)
+```javascript
+// Start WebRTC streaming
+webrtcSocket.send(JSON.stringify({
+    "type": "start-stream",
+    "quality": "high", // low|medium|high|ultra
+    "fps": 60
+}));
+
+// Quality control
+webrtcSocket.send(JSON.stringify({
+    "type": "quality-change",
+    "quality": "ultra"
+}));
+
+// FPS control
+webrtcSocket.send(JSON.stringify({
+    "type": "fps-change",
+    "fps": 90
+}));
+```
+
+#### Screenshot WebSocket (`/ws/{session-id}/screenshot`)
+```javascript
+// On-demand screenshot capture
+screenshotSocket.send(JSON.stringify({
+    "t": "refresh"
+}));
+
+// Auto-refresh on tap
+screenshotSocket.send(JSON.stringify({
+    "t": "tap",
+    "x": 195,
+    "y": 422
+}));
+```
+
+#### Logs WebSocket (`/ws/{session-id}/logs`)
+```javascript
+// Real-time log filtering
+logsSocket.send(JSON.stringify({
+    "type": "filter",
+    "filter": "search_term",
+    "level": "error" // error|warning|info|debug
+}));
+```
+
+## Backend Features
+
+### Device Control Capabilities
+- **Touch Gestures**: Precise tap and swipe with customizable duration and coordinates
+- **Hardware Buttons**: Complete hardware simulation including:
+  - Home button, Lock/Sleep button, Side button
+  - Siri activation, Apple Pay simulation
+  - Volume up/down controls
+- **Keyboard Input**: 
+  - Real-time individual key presses with HID codes
+  - Bulk text input with Unicode support
+  - Special keys: RETURN, SPACE, DELETE, arrow keys
+- **Device Orientation**: Portrait, landscape, portrait upside down, landscape left/right
+
+### Location Services
+- **Custom GPS Coordinates**: Set any latitude/longitude combination
+- **Predefined Locations**: Built-in presets including:
+  - Apple Park (Cupertino, CA)
+  - Major world cities (San Francisco, New York, London, Tokyo, Sydney)
+  - Activity presets (City Bicycle Ride, City Run, Freeway Drive)
+- **Location Simulation**: Realistic GPS simulation for location-based app testing
+
+### Media and File Management
+- **Photo Library**: Add images to simulator photo library
+  - Supported formats: JPG, JPEG, PNG, GIF, HEIC, HEIF
+  - Batch upload support
+- **Video Library**: Add videos to simulator video library
+  - Supported formats: MP4, MOV, M4V, AVI, MKV
+- **File Transfer**: Bidirectional file operations
+  - Push files to simulator file system
+  - Pull files from simulator
+  - App container access for app-specific files
+
+### Logging and Debugging
+- **Real-time Logs**: Live log streaming from iOS Simulator
+- **Log Filtering**: Filter by log level (error, warning, info, debug)
+- **Process Monitoring**: Track specific app processes
+- **Debug Endpoints**: Direct testing of device functions
+- **Comprehensive Error Handling**: Detailed error reporting and graceful degradation
+
+### Session Management
+- **Persistent Storage**: JSON-based session storage with atomic writes
+- **Orphaned Recovery**: Automatic detection and recovery of running simulators
+- **Multi-Session Support**: Concurrent management of multiple iOS simulators
+- **Hot Reload**: Development-friendly session persistence across server restarts
+- **Session Validation**: Real-time health checks and cleanup
+
+### Streaming and Recording
+- **Multiple Streaming Modes**:
+  - WebSocket-based video streaming with configurable quality
+  - WebRTC ultra-low latency streaming with adaptive bitrate
+  - Screenshot mode for high-quality static captures
+- **Quality Presets**: Low, Medium, High, Ultra with different resolutions and FPS
+- **Video Recording**: Full session recording with MP4 export
+- **Emergency Recording Save**: Automatic recording preservation on unexpected termination
+
+### Performance and Reliability
+- **Connection Management**: Rate limiting and connection tracking
+- **Resource Monitoring**: Memory usage and performance metrics
+- **Automatic Cleanup**: Background cleanup of resources and temporary files
+- **Health Monitoring**: Comprehensive health checks and status reporting
+- **Graceful Shutdown**: Clean termination with proper resource cleanup
+
+### Security Features
+- **Session Isolation**: Each simulator session is completely isolated
+- **Secure File Operations**: Safe file transfer with validation
+- **Process Sandboxing**: Proper process management and security
+- **Error Sanitization**: Safe error reporting without sensitive information exposure
+
+### Integration Capabilities
+- **REST API**: Complete RESTful API for all operations
+- **WebSocket Real-time**: Bidirectional real-time communication
+- **CLI Integration**: Seamless integration with command-line tools
+- **Web Interface**: Browser-based control with no installation required
 
 ## Common Use Cases
 
@@ -288,7 +520,9 @@ ws://localhost:8000/ws/{session-id}/screenshot
 ## Documentation
 
 - **[CLI Documentation](ios-bridge-cli/README.md)** - Complete CLI usage guide
-- **[Desktop App Development](ios-bridge-cli/ios_bridge_cli/electron_app/DEVELOPMENT.md)** - Electron app development
+- **[Desktop App README](ios-bridge-cli/ios_bridge_cli/electron_app/README.md)** - Electron desktop app overview
+- **[Desktop App Development](ios-bridge-cli/ios_bridge_cli/electron_app/DEVELOPMENT.md)** - Electron app development guide
+- **[Desktop App Commands](ios-bridge-cli/ios_bridge_cli/electron_app/DEV-COMMANDS.md)** - Quick development commands
 - **[API Documentation](http://localhost:8000/docs)** - Interactive API docs (when server running)
 - **[Cross-Platform Setup](CROSS_PLATFORM_SETUP.md)** - Team deployment guide
 
