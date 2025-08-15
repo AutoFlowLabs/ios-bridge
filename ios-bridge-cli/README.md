@@ -47,14 +47,20 @@ ios-bridge create "iPhone 15 Pro" "17.0" --wait
 ios-bridge list  # Copy the session ID
 ```
 
-**On Windows/Linux (Client):**
+**On Windows/Linux (Client with Full Features):**
 ```bash
-# Connect to your Mac
+# Connect to your Mac server
 ios-bridge connect http://YOUR-MAC-IP:8000 --save
 
-# Stream the session
-ios-bridge stream <session-id>
+# Full session management capabilities
+ios-bridge create "iPhone 15 Pro" "18.2" --wait  # Create sessions
+ios-bridge list                                   # List all sessions
+ios-bridge stream                                 # Stream (auto-detects session)
+ios-bridge terminate <session-id>                # Terminate sessions
+ios-bridge info <session-id>                     # Get session details
 ```
+
+> **✨ Important**: Windows and Linux clients have **complete feature parity** with macOS when connected to a Mac server. You can create, manage, stream, and control iOS sessions exactly like on Mac - the only requirement is the initial server connection.
 
 ### 3. Web Interface (Browser Streaming)
 

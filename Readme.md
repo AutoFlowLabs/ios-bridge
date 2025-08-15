@@ -52,11 +52,12 @@ pip install ios-bridge-cli
 ios-bridge create "iPhone 15 Pro" "18.2" --wait
 ios-bridge stream
 
-# On Windows/Linux (remote client - requires Mac server)
+# On Windows/Linux (remote client with full features)
 ios-bridge connect http://MAC-IP:8000 --save
-ios-bridge stream
+ios-bridge create "iPhone 15 Pro" "18.2" --wait  # Full session management
+ios-bridge stream                                 # Full streaming & control
 ```
-*Note: Server requires macOS + Xcode. Windows/Linux are remote clients only.*
+*Note: Server hosting requires macOS + Xcode. Windows/Linux clients have full feature parity when connected.*
 
 **Perfect For:**
 - Individual developers wanting desktop iOS simulator access
@@ -128,7 +129,7 @@ ios-bridge create "iPhone 15 Pro" "18.2" --wait
 ios-bridge stream
 ```
 
-**On Windows/Linux (Remote Client Only):**
+**On Windows/Linux (Remote Client with Full Features):**
 ```bash
 # Install the CLI
 pip install ios-bridge-cli
@@ -136,14 +137,14 @@ pip install ios-bridge-cli
 # Connect to Mac server (replace MAC-IP with actual Mac IP address)
 ios-bridge connect http://MAC-IP:8000 --save
 
-# Create session via remote server
-ios-bridge create "iPhone 15 Pro" "18.2" --wait
-
-# Stream from remote server
-ios-bridge stream
+# Full session management via remote server
+ios-bridge create "iPhone 15 Pro" "18.2" --wait  # Create sessions
+ios-bridge list                                   # List sessions
+ios-bridge stream                                 # Stream to desktop
+ios-bridge terminate <session-id>                # Terminate sessions
 ```
 
-> **⚠️ Important**: iOS Bridge server requires macOS + Xcode for iOS Simulator access. Windows and Linux can only run as remote clients connecting to a Mac server.
+> **⚠️ Note**: Server hosting requires macOS + Xcode. Windows/Linux clients have **full functionality** when connected to Mac server including session creation, management, streaming, and app control.
 
 ### 2. For Teams (Server + Web Interface)
 
@@ -222,12 +223,18 @@ npm run dev
 
 | Component | macOS | Windows | Linux | iOS/Android |
 |-----------|:-----:|:-------:|:-----:|:-----------:|
-| **FastAPI Server** | ✅ Host | ❌ | ❌ | ❌ |
-| **CLI Client** | ✅ Full | ✅ Remote | ✅ Remote | ❌ |
-| **Desktop App** | ✅ Native | ✅ Native | ✅ Native | ❌ |
-| **Web Interface** | ✅ Browser | ✅ Browser | ✅ Browser | ✅ Mobile |
+| **FastAPI Server** | ✅ Host Only | ❌ No Server | ❌ No Server | ❌ |
+| **CLI Client** | ✅ Local + Remote | ✅ Remote Full | ✅ Remote Full | ❌ |
+| **Desktop App** | ✅ Local + Remote | ✅ Remote Full | ✅ Remote Full | ❌ |
+| **Web Interface** | ✅ Local + Remote | ✅ Remote Full | ✅ Remote Full | ✅ Mobile |
 
-*Server requires macOS + Xcode for iOS Simulator access*
+**Capabilities when connected to Mac server:**
+- ✅ **Create/Delete Sessions** - Full session lifecycle management
+- ✅ **Stream & Control** - Desktop app and web interface streaming  
+- ✅ **App Management** - Install, launch, terminate iOS apps
+- ✅ **All Features** - Complete feature parity with local Mac usage
+
+*Server hosting requires macOS + Xcode for iOS Simulator access*
 
 ## Core Features
 
