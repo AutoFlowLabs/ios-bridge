@@ -38,6 +38,11 @@ class IOSBridgeRenderer {
             // Get configuration from main process
             this.config = await window.electronAPI.getConfig();
             
+            // Construct serverUrl from serverHost and serverPort if not present
+            if (!this.config.serverUrl && this.config.serverHost && this.config.serverPort) {
+                this.config.serverUrl = `http://${this.config.serverHost}:${this.config.serverPort}`;
+            }
+            
             // Initialize UI
             this.initializeUI();
             

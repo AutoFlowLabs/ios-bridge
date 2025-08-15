@@ -159,10 +159,58 @@ ios-bridge stream <session-id> --web-only
 
 ## Development
 
-To contribute or modify the desktop app:
+### Quick Development Start
+```bash
+# Setup
+npm install
 
+# Basic development mode
+npm run dev
+
+# Development with session override
+npm run dev -- --session-id=your-session-id
+
+# Development with multiple overrides
+npm run dev -- --session-id=abc123 --server-host=192.168.0.101 --quality=ultra --fullscreen
+```
+
+### Development Features
+- ✅ **Live reloading** when files change
+- ✅ **Chrome DevTools** for debugging (Ctrl+Shift+I or F12)
+- ✅ **Command line overrides** for testing different configurations
+- ✅ **Enhanced logging** and debugging
+- ✅ **WebRTC and WebSocket testing**
+
+### Command Line Overrides
+Override any config.json value from command line:
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--session-id` | Override session ID | `--session-id=abc123` |
+| `--server-host` | Override server hostname | `--server-host=192.168.0.101` |
+| `--server-port` | Override server port | `--server-port=8000` |
+| `--quality` | Override streaming quality | `--quality=ultra` |
+| `--fullscreen` | Start in fullscreen | `--fullscreen` |
+| `--always-on-top` | Keep window on top | `--always-on-top` |
+
+**Quality options:** `low`, `medium`, `high`, `ultra`
+
+### Development Workflow
+1. **Get available sessions:** `ios-bridge list`
+2. **Start development:** `npm run dev -- --session-id=YOUR_SESSION`
+3. **Open DevTools:** Press `F12` or `Ctrl+Shift+I`
+4. **Test WebSocket mode:** Default streaming mode
+5. **Test WebRTC mode:** Click "🚀 WebRTC Stream" button
+6. **Make changes:** Files auto-reload on save
+7. **Test production:** `npm run build` then `ios-bridge stream <session-id>`
+
+### Documentation
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Comprehensive development guide
+- **[DEV-COMMANDS.md](DEV-COMMANDS.md)** - Quick command reference
+
+### Contributing
 1. Install dependencies: `npm install`
-2. Run in development mode: `npm run dev`
-3. Developer tools will open automatically
+2. Run in development mode: `npm run dev -- --session-id=YOUR_SESSION`
+3. Developer tools open automatically with enhanced logging
 4. Make changes to files in `src/`
-5. Reload with Cmd/Ctrl+R to see changes
+5. Changes reload automatically - no manual refresh needed

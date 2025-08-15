@@ -146,6 +146,65 @@ ios-bridge screenshot <session_id> --output screenshot.png
 └─────────────────┘                 └─────────────────┘           └─────────────────┘
 ```
 
+## Development
+
+### Desktop App Development
+
+The iOS Bridge desktop app (Electron) supports development mode with live reloading and debugging capabilities.
+
+**Quick Start:**
+```bash
+cd ios-bridge-cli/ios_bridge_cli/electron_app
+npm install
+npm run dev
+```
+
+**Development with Session Override:**
+```bash
+# Override session ID from command line
+npm run dev -- --session-id=your-session-id
+
+# Multiple overrides
+npm run dev -- --session-id=abc123 --server-host=192.168.0.101 --quality=ultra --fullscreen
+```
+
+**Available Override Options:**
+- `--session-id` - Override session ID
+- `--server-host` - Override server hostname  
+- `--server-port` - Override server port
+- `--quality` - Override streaming quality (low/medium/high/ultra)
+- `--fullscreen` - Enable fullscreen mode
+- `--always-on-top` - Keep window always on top
+
+**Development Features:**
+- 🔄 Live reloading when files change
+- 🛠️ Chrome DevTools for debugging (Ctrl+Shift+I)
+- 📝 Enhanced logging and debugging
+- 🎯 Command line configuration overrides
+- 🚀 WebRTC and WebSocket testing
+
+For detailed development documentation, see: [DEVELOPMENT.md](ios_bridge_cli/electron_app/DEVELOPMENT.md)
+
+### CLI Development
+
+**Setting up CLI for development:**
+```bash
+# Clone and install in development mode
+git clone <repo-url>
+cd ios-bridge-cli
+pip install -e .
+```
+
+**Testing CLI changes:**
+```bash
+# Test CLI commands
+ios-bridge list
+ios-bridge stream <session-id>
+
+# Test with different servers
+ios-bridge --server http://remote-server:8000 list
+```
+
 ## License
 
 MIT License

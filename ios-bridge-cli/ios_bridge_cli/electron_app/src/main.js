@@ -39,6 +39,89 @@ class IOSBridgeApp {
             console.error('No config file specified');
             process.exit(1);
         }
+        
+        // Handle command line overrides
+        this.handleCommandLineOverrides(args);
+    }
+    
+    handleCommandLineOverrides(args) {
+        console.log('🔧 Raw command line args:', args);
+        
+        // Override session ID if provided (handle both --session-id=value and --session-id value formats)
+        let newSessionId = null;
+        
+        // Check for --session-id=value format
+        const sessionIdArg = args.find(arg => arg.startsWith('--session-id='));
+        if (sessionIdArg) {
+            newSessionId = sessionIdArg.split('=')[1];
+            console.log(`🔍 Found --session-id=value format: ${newSessionId}`);
+        } else {
+            // Check for --session-id value format
+            const sessionIndex = args.indexOf('--session-id');
+            if (sessionIndex !== -1 && sessionIndex + 1 < args.length) {
+                newSessionId = args[sessionIndex + 1];
+                console.log(`🔍 Found --session-id value format: ${newSessionId}`);
+            }
+        }
+        
+        if (newSessionId) {
+            console.log(`🔄 Overriding session ID: ${this.config.sessionId} → ${newSessionId}`);
+            this.config.sessionId = newSessionId;
+        } else {
+            console.log('ℹ️ No --session-id override found');
+        }
+        
+        // Override server host if provided (handle both formats)
+        let newHost = args.find(arg => arg.startsWith('--server-host='))?.split('=')[1];
+        if (!newHost) {
+            const hostIndex = args.indexOf('--server-host');
+            if (hostIndex !== -1 && hostIndex + 1 < args.length) {
+                newHost = args[hostIndex + 1];
+            }
+        }
+        if (newHost) {
+            console.log(`🔄 Overriding server host: ${this.config.serverHost} → ${newHost}`);
+            this.config.serverHost = newHost;
+        }
+        
+        // Override server port if provided (handle both formats)
+        let newPort = args.find(arg => arg.startsWith('--server-port='))?.split('=')[1];
+        if (!newPort) {
+            const portIndex = args.indexOf('--server-port');
+            if (portIndex !== -1 && portIndex + 1 < args.length) {
+                newPort = args[portIndex + 1];
+            }
+        }
+        if (newPort) {
+            const portNumber = parseInt(newPort);
+            console.log(`🔄 Overriding server port: ${this.config.serverPort} → ${portNumber}`);
+            this.config.serverPort = portNumber;
+        }
+        
+        // Override quality if provided (handle both formats)
+        let newQuality = args.find(arg => arg.startsWith('--quality='))?.split('=')[1];
+        if (!newQuality) {
+            const qualityIndex = args.indexOf('--quality');
+            if (qualityIndex !== -1 && qualityIndex + 1 < args.length) {
+                newQuality = args[qualityIndex + 1];
+            }
+        }
+        if (newQuality) {
+            console.log(`🔄 Overriding quality: ${this.config.streaming.quality} → ${newQuality}`);
+            this.config.streaming.quality = newQuality;
+        }
+        
+        // Enable fullscreen if provided
+        if (args.includes('--fullscreen')) {
+            console.log('🔄 Enabling fullscreen mode');
+            this.config.fullscreen = true;
+        }
+        
+        // Enable always on top if provided
+        if (args.includes('--always-on-top')) {
+            console.log('🔄 Enabling always on top');
+            this.config.alwaysOnTop = true;
+        }
     }
     
     setupAppHandlers() {
