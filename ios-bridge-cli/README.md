@@ -27,7 +27,7 @@ pip install ios-bridge-cli
 
 ```bash
 # Create an iPhone simulator
-ios-bridge create "iPhone 15 Pro" "17.0" --wait
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
 
 # Stream it to desktop
 ios-bridge stream
@@ -43,7 +43,7 @@ That's it! A desktop window opens with your iOS simulator ready for interaction.
 ios-bridge start-server --host 0.0.0.0
 
 # Create and get session ID
-ios-bridge create "iPhone 15 Pro" "17.0" --wait
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
 ios-bridge list  # Copy the session ID
 ```
 
@@ -131,7 +131,7 @@ ios-bridge server-status
 
 # Use all commands with remote server
 ios-bridge devices
-ios-bridge create "iPhone 14" "17.0"
+ios-bridge create "iPhone 14" "18.2"
 ```
 
 ## Desktop Controls
@@ -217,7 +217,7 @@ The server runs on macOS (where iOS simulators are available) and streams to des
 ios-bridge list
 
 # Create a new session
-ios-bridge create "iPhone 15 Pro" "17.0" --wait
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
 ```
 
 **Connection errors**
@@ -260,4 +260,4 @@ MIT License - see LICENSE file for details
 
 ---
 
-**Getting Started**: `pip install ios-bridge-cli && ios-bridge create "iPhone 15 Pro" "17.0" --wait && ios-bridge stream`
+**Getting Started**: `pip install ios-bridge-cli && ios-bridge start-server && ios-bridge create "iPhone 15 Pro" "18.2" --wait && ios-bridge stream`

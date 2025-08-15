@@ -170,7 +170,7 @@ ios-bridge start-server --background
 
 # Create session via API
 curl -X POST "http://localhost:8000/api/sessions/create" \
-  -d "device_type=iPhone 15 Pro&ios_version=17.0"
+  -d "device_type=iPhone 15 Pro&ios_version=18.2"
 
 # Connect to WebSocket for control
 ws://localhost:8000/ws/{session-id}/control
@@ -189,7 +189,7 @@ ws://localhost:8000/ws/{session-id}/control
 
 ```bash
 pip install ios-bridge-cli
-ios-bridge create "iPhone 15 Pro" "17.0" --wait
+ios-bridge create "iPhone 15 Pro" "18.2" --wait
 ios-bridge stream
 ```
 
@@ -632,7 +632,7 @@ ios-bridge/
 **"No sessions available"**
 ```bash
 ios-bridge list                    # Check existing sessions
-ios-bridge create "iPhone 15" "17.0" --wait  # Create new session
+ios-bridge create "iPhone 15" "18.2" --wait  # Create new session
 ```
 
 **Connection errors**
@@ -701,10 +701,11 @@ Your expertise could make a significant impact on this project. Whether it's cod
 ### 🙏 Acknowledgments
 
 **Special Thanks:**
+- **[Meta's IDB (iOS Debug Bridge)](https://fbidb.io/)** - For providing the foundational CLI commands and iOS control capabilities that inspired iOS Bridge. The [idb project](https://github.com/facebook/idb) serves as the backbone for iOS device automation, and without their excellent work, iOS Bridge wouldn't exist.
 - **[Claude Code](https://claude.ai/code)** - For exceptional assistance with documentation, code structure improvements, and being an invaluable development companion throughout this project
 - **The Open Source Community** - For inspiration, tools, and the collaborative spirit that makes projects like this possible
 - **All Contributors** - Past, present, and future contributors who help make iOS Bridge better
 
 ---
 
-**Getting Started**: `pip install ios-bridge-cli && ios-bridge create "iPhone 15 Pro" "18.2" --wait && ios-bridge stream`
+**Getting Started**: `pip install ios-bridge-cli && ios-bridge start-server && ios-bridge create "iPhone 15 Pro" "18.2" --wait && ios-bridge stream`

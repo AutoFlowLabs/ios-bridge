@@ -75,7 +75,7 @@ ios-bridge devices --server http://localhost:8000
 # iOS Versions:
 #   • 16.0
 #   • 16.1
-#   • 17.0
+#   • 18.2
 #   ... etc
 ```
 
