@@ -441,9 +441,16 @@ class IOSBridgeRenderer {
         return new Promise((resolve, reject) => {
             console.log('🚀 Initializing WebRTC connection...');
             
-            // Create peer connection
+            // Create peer connection with multiple ICE servers for better connectivity
             this.peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun.cloudflare.com:3478' },
+                    { urls: 'stun:openrelay.metered.ca:80' }
+                ],
+                iceCandidatePoolSize: 10
             });
             
             // Handle incoming video stream
@@ -473,42 +480,77 @@ class IOSBridgeRenderer {
             
             // Connection state change handler
             this.peerConnection.onconnectionstatechange = () => {
-                console.log(`WebRTC connection state: ${this.peerConnection.connectionState}`);
+                console.log(`🔗 WebRTC connection state: ${this.peerConnection.connectionState}`);
                 if (this.peerConnection.connectionState === 'connected') {
                     console.log('🎉 WebRTC connection established successfully');
+                } else if (this.peerConnection.connectionState === 'failed') {
+                    console.error('❌ WebRTC connection failed');
+                    reject(new Error('WebRTC connection failed'));
                 }
             };
-            
+
+            // ICE connection state change handler
+            this.peerConnection.oniceconnectionstatechange = () => {
+                console.log(`🧊 ICE connection state: ${this.peerConnection.iceConnectionState}`);
+            };
+
+            // ICE gathering state change handler
+            this.peerConnection.onicegatheringstatechange = () => {
+                console.log(`🔍 ICE gathering state: ${this.peerConnection.iceGatheringState}`);
+            };
+
             // Setup WebRTC signaling WebSocket
             const signalingWs = new WebSocket(webrtcUrl);
+            
+            // ICE candidate handler - send candidates to server
+            this.peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log(`🧊 ICE candidate: ${event.candidate.candidate}`);
+                    // Send ICE candidate to server via signaling WebSocket
+                    if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
+                        signalingWs.send(JSON.stringify({
+                            type: 'ice-candidate',
+                            candidate: event.candidate
+                        }));
+                    }
+                } else {
+                    console.log('🧊 ICE gathering completed');
+                }
+            };
             
             signalingWs.onopen = async () => {
                 console.log('📡 WebRTC signaling connected');
                 
                 try {
                     // Start the stream
+                    console.log('📡 Sending start-stream request');
                     signalingWs.send(JSON.stringify({
                         type: 'start-stream',
                         quality: this.currentQuality,
+                        sessionId: this.config?.sessionInfo?.session_id,
                         fps: 30
                     }));
                     
                     // Create offer
+                    console.log('🔧 Creating WebRTC offer');
                     const offer = await this.peerConnection.createOffer({
                         offerToReceiveVideo: true,
                         offerToReceiveAudio: false
                     });
                     
                     await this.peerConnection.setLocalDescription(offer);
+                    console.log('✅ Local description set');
                     
                     // Send offer to server
+                    console.log('📡 Sending WebRTC offer to server');
                     signalingWs.send(JSON.stringify({
                         type: 'offer',
                         sdp: offer.sdp
                     }));
+                    console.log('✅ WebRTC offer sent');
                     
                 } catch (error) {
-                    console.error('WebRTC offer creation error:', error);
+                    console.error('❌ WebRTC offer creation error:', error);
                     reject(error);
                 }
             };
@@ -516,25 +558,31 @@ class IOSBridgeRenderer {
             signalingWs.onmessage = async (event) => {
                 try {
                     const data = JSON.parse(event.data);
+                    console.log(`📡 WebRTC signaling received: ${data.type}`);
                     
                     if (data.type === 'stream-ready') {
                         console.log('🎬 WebRTC stream ready');
                     } else if (data.type === 'answer') {
+                        console.log('🤝 Received WebRTC answer, setting remote description');
                         await this.peerConnection.setRemoteDescription(
                             new RTCSessionDescription({
                                 type: 'answer',
                                 sdp: data.sdp
                             })
                         );
-                        console.log('🤝 WebRTC answer received and set');
+                        console.log('✅ WebRTC remote description set successfully');
                         resolve();
                     } else if (data.type === 'ice-candidate') {
                         if (data.candidate) {
+                            console.log(`🧊 Received server ICE candidate: ${data.candidate.candidate}`);
                             await this.peerConnection.addIceCandidate(data.candidate);
+                            console.log('✅ Server ICE candidate added successfully');
                         }
                     } else if (data.type === 'error') {
-                        console.error('WebRTC signaling error:', data.message);
+                        console.error('❌ WebRTC signaling error:', data.message);
                         reject(new Error(data.message));
+                    } else {
+                        console.log(`📡 Unknown WebRTC message type: ${data.type}`, data);
                     }
                 } catch (error) {
                     console.error('WebRTC signaling message error:', error);

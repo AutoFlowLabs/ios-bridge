@@ -192,6 +192,33 @@ def get_client(ctx):
     return cli_context.client
 
 
+def resolve_session_id(ctx, session_id):
+    """Resolve session ID with auto-detection for single session scenarios"""
+    if session_id:
+        return session_id
+    
+    # Auto-detect session if not provided
+    try:
+        sessions = get_client(ctx).list_sessions()
+        
+        if not sessions:
+            raise SessionNotFoundError("No active sessions found")
+        elif len(sessions) == 1:
+            auto_session_id = sessions[0]['session_id']
+            click.echo(f"🎯 Auto-detected session: {auto_session_id}")
+            return auto_session_id
+        else:
+            raise SessionNotFoundError(
+                f"Multiple sessions found ({len(sessions)}). Please specify a session ID:\n" +
+                "\n".join([f"  • {s['session_id']} - {s.get('device_type', 'Unknown')}" for s in sessions]) +
+                f"\n\nUse: ios-bridge list  # to see all sessions"
+            )
+    except Exception as e:
+        if isinstance(e, SessionNotFoundError):
+            raise
+        raise SessionNotFoundError(f"Failed to auto-detect session: {e}")
+
+
 def find_ios_bridge_server():
     """Find the iOS Bridge server directory"""
     # Look for the server in common locations relative to CLI
@@ -262,7 +289,7 @@ def check_server_command_available():
 
 
 @cli.command()
-@click.argument('session_id')
+@click.argument('session_id', required=False)
 @click.option('--quality', '-q',
               type=click.Choice(['low', 'medium', 'high', 'ultra']),
               default='high',
@@ -280,9 +307,12 @@ def stream(ctx, session_id: str, quality: str, fullscreen: bool, always_on_top: 
     server = ctx.obj['server']
     verbose = ctx.obj['verbose']
     
-    click.echo(f"🚀 Starting iOS Bridge streaming for session: {session_id}")
-    
     try:
+        # Auto-detect session ID if not provided
+        session_id = resolve_session_id(ctx, session_id)
+        
+        click.echo(f"🚀 Starting iOS Bridge streaming for session: {session_id}")
+        
         # Validate session exists
         session_info = get_client(ctx).get_session_info(session_id)
         if not session_info:
@@ -402,19 +432,28 @@ def list(ctx, format: str):
             import json
             click.echo(json.dumps(sessions, indent=2))
         else:
-            # Table format
+            # Table format - show full session IDs
             click.echo("📱 Active iOS Bridge Sessions:")
-            click.echo("-" * 80)
-            click.echo(f"{'Session ID':<12} {'Device Type':<20} {'iOS Version':<12} {'Status':<10}")
-            click.echo("-" * 80)
+            click.echo("-" * 120)
+            click.echo(f"{'Session ID':<40} {'Device Type':<25} {'iOS Version':<15} {'Status':<10}")
+            click.echo("-" * 120)
             
             for session in sessions:
-                click.echo(f"{session['session_id'][:12]:<12} "
-                          f"{session.get('device_type', 'Unknown'):<20} "
-                          f"{session.get('ios_version', 'Unknown'):<12} "
-                          f"{'Online' if session.get('status') == 'healthy' else 'Offline':<10}")
+                session_id = session['session_id']
+                device_type = session.get('device_type', 'Unknown')[:24]  # Truncate device type if too long
+                ios_version = session.get('ios_version', 'Unknown')[:14]  # Truncate iOS version if too long
+                status = 'Online' if session.get('status') == 'healthy' else 'Offline'
+                
+                click.echo(f"{session_id:<40} {device_type:<25} {ios_version:<15} {status:<10}")
             
             click.echo(f"\n📊 Total: {len(sessions)} sessions")
+            
+            # Helpful tip for single session
+            if len(sessions) == 1:
+                click.echo(f"💡 Tip: Since you have only one session, you can use commands without specifying the session ID:")
+                click.echo(f"   ios-bridge stream")
+                click.echo(f"   ios-bridge info") 
+                click.echo(f"   ios-bridge terminate")
             
     except ConnectionError as e:
         click.echo(f"🔌 Connection error: {e}", err=True)
@@ -428,7 +467,7 @@ def list(ctx, format: str):
 
 
 @cli.command()
-@click.argument('session_id')
+@click.argument('session_id', required=False)
 @click.pass_context
 def info(ctx, session_id: str):
     """Show detailed information about a session"""
@@ -436,6 +475,9 @@ def info(ctx, session_id: str):
     verbose = ctx.obj['verbose']
     
     try:
+        # Auto-detect session ID if not provided
+        session_id = resolve_session_id(ctx, session_id)
+        
         session_info = get_client(ctx).get_session_info(session_id)
         if not session_info:
             raise SessionNotFoundError(f"Session {session_id} not found")
@@ -475,7 +517,7 @@ def info(ctx, session_id: str):
 
 
 @cli.command()
-@click.argument('session_id')
+@click.argument('session_id', required=False)
 @click.option('--output', '-o',
               default='screenshot.png',
               help='Output file path')
@@ -486,6 +528,9 @@ def screenshot(ctx, session_id: str, output: str):
     verbose = ctx.obj['verbose']
     
     try:
+        # Auto-detect session ID if not provided
+        session_id = resolve_session_id(ctx, session_id)
+        
         # Validate session exists
         session_info = get_client(ctx).get_session_info(session_id)
         if not session_info:
@@ -645,7 +690,7 @@ def create(ctx, device_type: str, ios_version: str, wait: bool):
 
 
 @cli.command()
-@click.argument('session_id')
+@click.argument('session_id', required=False)
 @click.option('--force', '-f',
               is_flag=True,
               help='Force termination without confirmation')
@@ -656,6 +701,9 @@ def terminate(ctx, session_id: str, force: bool):
     verbose = ctx.obj['verbose']
     
     try:
+        # Auto-detect session ID if not provided
+        session_id = resolve_session_id(ctx, session_id)
+        
         # Get session info first
         session_info = get_client(ctx).get_session_info(session_id)
         if not session_info:

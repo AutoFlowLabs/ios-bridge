@@ -13,7 +13,7 @@ class WebRTCWebSocket:
     
     async def handle_connection(self, websocket: WebSocket):
         """Handle WebRTC signaling WebSocket for real-time streaming"""
-        await websocket.accept()
+        # WebSocket is already accepted in the route handler - don't accept again
         connection_id = f"realtime_{id(websocket)}"
         
         logger.info(f"Real-time WebRTC signaling connected: {connection_id}")

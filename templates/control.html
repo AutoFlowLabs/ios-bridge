@@ -2841,9 +2841,16 @@
             status.className = 'connected';
 
             try {
-                // Create WebRTC connection with optimized settings
+                // Create WebRTC connection with multiple ICE servers for better connectivity
                 peerConnection = new RTCPeerConnection({
-                    iceServers: [],
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun.cloudflare.com:3478' },
+                        { urls: 'stun:openrelay.metered.ca:80' }
+                    ],
+                    iceCandidatePoolSize: 10,
                     bundlePolicy: 'max-bundle',
                     rtcpMuxPolicy: 'require'
                 });
@@ -2862,14 +2869,42 @@
                         status.className = 'connected';
                     };
                 };
+
+                // ICE connection state change handler
+                peerConnection.oniceconnectionstatechange = () => {
+                    console.log(`🧊 ICE connection state: ${peerConnection.iceConnectionState}`);
+                };
+
+                // ICE gathering state change handler
+                peerConnection.onicegatheringstatechange = () => {
+                    console.log(`🔍 ICE gathering state: ${peerConnection.iceGatheringState}`);
+                };
+
+                // ICE candidate handler - send candidates to server
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        console.log(`🧊 ICE candidate: ${event.candidate.candidate}`);
+                        // Send ICE candidate to server via signaling WebSocket
+                        if (webrtcWs && webrtcWs.readyState === WebSocket.OPEN) {
+                            webrtcWs.send(JSON.stringify({
+                                type: 'ice-candidate',
+                                candidate: event.candidate
+                            }));
+                        }
+                    } else {
+                        console.log('🧊 ICE gathering completed');
+                    }
+                };
                 // Enhanced connection state handling
                 peerConnection.onconnectionstatechange = () => {
-                    console.log('WebRTC connection state:', peerConnection.connectionState);
+                    console.log(`🔗 WebRTC connection state: ${peerConnection.connectionState}`);
 
                     if (peerConnection.connectionState === 'connected') {
+                        console.log('🎉 WebRTC connection established successfully');
                         startWebRTCStatsMonitoring();
                         optimizeWebRTCQuality();
                     } else if (peerConnection.connectionState === 'failed') {
+                        console.error('❌ WebRTC connection failed');
                         status.textContent = 'WebRTC connection failed - retrying...';
                         status.className = 'disconnected';
                         setTimeout(() => setupWebRTCStream(), 2000);
@@ -2880,40 +2915,73 @@
                 webrtcWs = new WebSocket(`ws://${location.hostname}:8000/ws/${SESSION_ID}/webrtc`);
 
                 webrtcWs.onopen = async () => {
-                    console.log('WebRTC signaling connected');
+                    console.log('📡 WebRTC signaling connected');
 
-                    // Create offer with quality constraints
-                    const offer = await peerConnection.createOffer({
-                        offerToReceiveVideo: true,
-                        offerToReceiveAudio: false,
-                        voiceActivityDetection: false
-                    });
+                    try {
+                        // Send start stream request first
+                        console.log('📡 Sending start-stream request');
+                        webrtcWs.send(JSON.stringify({
+                            type: 'start-stream',
+                            quality: currentWebRTCQuality,
+                            sessionId: SESSION_ID
+                        }));
 
-                    // Enhance SDP for better quality
-                    const enhancedOffer = enhanceSDPForQuality(offer);
-                    await peerConnection.setLocalDescription(enhancedOffer);
+                        // Create offer with quality constraints
+                        console.log('🔧 Creating WebRTC offer');
+                        const offer = await peerConnection.createOffer({
+                            offerToReceiveVideo: true,
+                            offerToReceiveAudio: false,
+                            voiceActivityDetection: false
+                        });
 
-                    // Send enhanced offer
-                    webrtcWs.send(JSON.stringify({
-                        type: 'offer',
-                        sdp: enhancedOffer.sdp
-                    }));
+                        // Enhance SDP for better quality
+                        const enhancedOffer = enhanceSDPForQuality(offer);
+                        await peerConnection.setLocalDescription(enhancedOffer);
+                        console.log('✅ Local description set');
+
+                        // Send enhanced offer
+                        console.log('📡 Sending WebRTC offer to server');
+                        webrtcWs.send(JSON.stringify({
+                            type: 'offer',
+                            sdp: enhancedOffer.sdp
+                        }));
+                        console.log('✅ WebRTC offer sent');
+                    } catch (error) {
+                        console.error('❌ Error during WebRTC setup:', error);
+                        status.textContent = 'WebRTC setup failed';
+                        status.className = 'disconnected';
+                    }
                 };
 
                 webrtcWs.onmessage = async (event) => {
-                    const data = JSON.parse(event.data);
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log(`📡 WebRTC signaling received: ${data.type}`);
 
-                    if (data.type === 'answer') {
-                        const enhancedAnswer = enhanceSDPForQuality({
-                            type: 'answer',
-                            sdp: data.sdp
-                        });
+                        if (data.type === 'answer') {
+                            console.log('🤝 Received WebRTC answer, setting remote description');
+                            const enhancedAnswer = enhanceSDPForQuality({
+                                type: 'answer',
+                                sdp: data.sdp
+                            });
 
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(enhancedAnswer));
-                    } else if (data.type === 'ice-candidate') {
-                        if (data.candidate) {
-                            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                            await peerConnection.setRemoteDescription(new RTCSessionDescription(enhancedAnswer));
+                            console.log('✅ WebRTC remote description set successfully');
+                        } else if (data.type === 'ice-candidate') {
+                            if (data.candidate) {
+                                console.log(`🧊 Received server ICE candidate: ${data.candidate.candidate}`);
+                                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                                console.log('✅ Server ICE candidate added successfully');
+                            }
+                        } else if (data.type === 'error') {
+                            console.error('❌ WebRTC signaling error:', data.message);
+                            status.textContent = `WebRTC error: ${data.message}`;
+                            status.className = 'disconnected';
+                        } else {
+                            console.log(`📡 Unknown WebRTC message type: ${data.type}`, data);
                         }
+                    } catch (error) {
+                        console.error('❌ WebRTC signaling message error:', error);
                     }
                 };
 
