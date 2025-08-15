@@ -150,11 +150,11 @@ ios-bridge terminate <session-id>                # Terminate sessions
 
 **Mac Server Setup:**
 ```bash
-# Clone and start the server
-git clone <repo-url>
-cd ios-bridge
-pip install -r requirements.txt
-PYTHONPATH=$(pwd) python app/main.py
+# Install iOS Bridge CLI (includes server)
+pip install ios-bridge-cli
+
+# Start server for team access
+ios-bridge start-server --host 0.0.0.0 --port 8000
 ```
 
 **Team Access:**
@@ -164,6 +164,10 @@ PYTHONPATH=$(pwd) python app/main.py
 ### 3. For Custom Integration (API)
 
 ```bash
+# Start the server
+pip install ios-bridge-cli
+ios-bridge start-server --background
+
 # Create session via API
 curl -X POST "http://localhost:8000/api/sessions/create" \
   -d "device_type=iPhone 15 Pro&ios_version=17.0"
@@ -189,28 +193,31 @@ ios-bridge create "iPhone 15 Pro" "17.0" --wait
 ios-bridge stream
 ```
 
-### Option 2: Full Server Setup
+### Option 2: Team Server Setup
 
 ```bash
-# Clone repository
-git clone <repo-url>
-cd ios-bridge
+# Install iOS Bridge CLI (includes all dependencies)
+pip install ios-bridge-cli
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Install additional tools
+# Install additional tools for advanced features
 brew install ffmpeg idb-companion
 pip install fb-idb
 
-# Start server
-PYTHONPATH=$(pwd) python app/main.py
+# Start server for team access
+ios-bridge start-server --host 0.0.0.0 --port 8000
 ```
 
-### Option 3: Development Setup
+### Option 3: Development Setup (Advanced)
+
+*Only needed for contributing to iOS Bridge or custom server modifications*
 
 ```bash
-# Server development
+# Clone repository for development
+git clone <repo-url>
+cd ios-bridge
+
+# Server development with hot reload
+pip install -r requirements.txt
 PYTHONPATH=$(pwd) uvicorn app.main:app --reload
 
 # Desktop app development
@@ -581,7 +588,11 @@ logsSocket.send(JSON.stringify({
 ### Quick Development Start
 
 ```bash
-# Server development
+# For most users - just use the CLI
+pip install ios-bridge-cli
+ios-bridge start-server --background
+
+# For server development (contributors only)
 git clone <repo-url>
 cd ios-bridge
 pip install -r requirements.txt
