@@ -161,6 +161,9 @@ class ElectronAppManager:
         """Check if the app exists and is valid"""
         app_path = self._get_app_executable_path()
         
+        if self.verbose:
+            print(f"🔍 Checking app at: {app_path}")
+        
         if not app_path.exists():
             if self.verbose:
                 print(f"🔍 App not found at: {app_path}")
@@ -172,8 +175,15 @@ class ElectronAppManager:
                 print(f"🔍 App not executable: {app_path}")
             return False
         
+        if self.verbose:
+            print(f"✅ App executable found at: {app_path}")
+        
         # Check version file exists (but don't require exact match)
         version_file = app_path.parent / ".version"
+        if self.verbose:
+            print(f"🔍 Looking for version file at: {version_file}")
+            print(f"🔍 Directory contents: {list(app_path.parent.iterdir()) if app_path.parent.exists() else 'Directory does not exist'}")
+        
         if not version_file.exists():
             if self.verbose:
                 print(f"🔍 No version file at: {version_file}")
@@ -183,16 +193,22 @@ class ElectronAppManager:
             with open(version_file, 'r') as f:
                 cached_version = f.read().strip()
             
+            if self.verbose:
+                print(f"🔍 Read version from file: '{cached_version}'")
+            
             # Allow any valid version (don't force exact CLI version match)
             # This prevents re-downloading when CLI version != app version
             if cached_version and len(cached_version.split('.')) >= 2:
                 if self.verbose:
                     print(f"✅ Found valid app version: {cached_version}")
                 return True
+            else:
+                if self.verbose:
+                    print(f"🔍 Invalid version format: '{cached_version}'")
             return False
-        except:
+        except Exception as e:
             if self.verbose:
-                print(f"🔍 Could not read version file")
+                print(f"🔍 Could not read version file: {e}")
             return False
     
     def _download_with_progress(self, url: str, dest_path: Path, description: str):
@@ -239,11 +255,37 @@ class ElectronAppManager:
         else:
             raise ElectronAppError(f"Unsupported archive format: {archive_path.suffix}")
         
-        # Write version file
-        version_file = extract_to / ".version"
+        # Write version file to the same location where we'll look for it later
         version_to_write = version or self.current_version
-        with open(version_file, 'w') as f:
+        
+        # Write version file to extraction root
+        version_file_root = extract_to / ".version"
+        with open(version_file_root, 'w') as f:
             f.write(version_to_write)
+        if self.verbose:
+            print(f"📝 Version file written to root: {version_file_root}")
+        
+        # Write version file to all possible platform-specific subdirectories
+        # This ensures _app_exists_and_valid can find it regardless of extraction structure
+        system = platform.system()
+        
+        possible_subdirs = []
+        if system == "Darwin":
+            possible_subdirs = ["mac-arm64", "mac-x64"]
+        elif system == "Windows":
+            possible_subdirs = ["win-unpacked", "win-ia32-unpacked"]
+        else:  # Linux
+            possible_subdirs = ["linux-unpacked", "linux-x64-unpacked"]
+        
+        for subdir in possible_subdirs:
+            subdir_path = extract_to / subdir
+            if subdir_path.exists() or True:  # Create even if doesn't exist yet
+                subdir_path.mkdir(parents=True, exist_ok=True)
+                version_file_sub = subdir_path / ".version"
+                with open(version_file_sub, 'w') as f:
+                    f.write(version_to_write)
+                if self.verbose:
+                    print(f"📝 Version file written to subdir: {version_file_sub}")
         
         # Make Linux/macOS executables executable
         system, _ = self._get_platform_info()

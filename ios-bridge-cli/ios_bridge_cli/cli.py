@@ -39,34 +39,45 @@ class CLIContext:
                 import requests
                 import time
                 
-                # Get server URL from client config
-                server_url = f"http://{self.client.host}:{self.client.port}"
+                # Get server URL from client config - handle both old and new client attributes
+                server_url = getattr(self.client, 'server_url', None) or getattr(self.client, 'base_url', None)
+                if not server_url and hasattr(self.client, 'host') and hasattr(self.client, 'port'):
+                    # Fallback for old client structure
+                    server_url = f"http://{self.client.host}:{self.client.port}"
                 
-                # Call cleanup endpoint with timeout
-                response = requests.post(
-                    f"{server_url}/api/sessions/cleanup-recordings",
-                    timeout=5,
-                    headers={'Content-Type': 'application/json'}
-                )
-                
-                if response.status_code == 200:
-                    click.echo("✅ Recording cleanup completed")
-                else:
-                    click.echo(f"⚠️ Recording cleanup returned status {response.status_code}")
+                if server_url:
+                    # Call cleanup endpoint with timeout
+                    response = requests.post(
+                        f"{server_url}/api/sessions/cleanup-recordings",
+                        timeout=3,  # Reduced timeout for faster exit
+                        headers={'Content-Type': 'application/json'}
+                    )
                     
-                # Small delay to ensure cleanup completes
-                time.sleep(0.5)
-                
+                    if response.status_code == 200:
+                        click.echo("✅ Recording cleanup completed")
+                    else:
+                        click.echo(f"⚠️ Recording cleanup returned status {response.status_code}")
+                else:
+                    click.echo("⚠️ Could not determine server URL for cleanup")
+                    
             except Exception as e:
                 click.echo(f"⚠️ Error during recording cleanup: {e}")
+                # Don't let cleanup errors prevent exit
         
-        # Stop app manager
+        # Stop app manager with force termination
         if self.app_manager:
             try:
                 click.echo("🖥️ Stopping desktop app...")
                 self.app_manager.stop()
             except Exception as e:
-                click.echo(f"Error stopping app manager: {e}", err=True)
+                click.echo(f"⚠️ Error stopping app manager: {e}")
+                # Force kill app manager process if it exists
+                try:
+                    if hasattr(self.app_manager, 'process') and self.app_manager.process:
+                        click.echo("⚡ Force terminating desktop app...")
+                        self.app_manager.process.kill()
+                except:
+                    pass
         
         # Run other cleanup handlers
         for handler in self.cleanup_handlers:
@@ -84,14 +95,29 @@ cli_context = CLIContext()
 
 def signal_handler(signum, frame):
     """Handle Ctrl+C and other signals"""
-    click.echo("\n🛑 Shutting down iOS Bridge CLI...")
-    try:
-        cli_context.cleanup()
-    except Exception as e:
-        click.echo(f"Error during cleanup: {e}", err=True)
-    finally:
-        # Force exit to ensure we don't get stuck
-        os._exit(0)
+    # Only handle signals if not already in cleanup
+    if not getattr(signal_handler, 'cleanup_in_progress', False):
+        signal_handler.cleanup_in_progress = True
+        click.echo("\n🛑 Shutting down iOS Bridge CLI...")
+        
+        # Set a timeout for cleanup - force exit after 5 seconds
+        def force_exit():
+            import time
+            time.sleep(5)
+            click.echo("⚡ Force exiting due to cleanup timeout...")
+            os._exit(1)
+        
+        import threading
+        timeout_thread = threading.Thread(target=force_exit, daemon=True)
+        timeout_thread.start()
+        
+        try:
+            cli_context.cleanup()
+        except Exception as e:
+            click.echo(f"⚠️ Error during cleanup: {e}")
+        finally:
+            # Force exit to ensure we don't get stuck
+            os._exit(0)
 
 
 # Register signal handlers
@@ -326,12 +352,13 @@ def stream(ctx, session_id: str, quality: str, fullscreen: bool, always_on_top: 
         
         # This will block until the window is closed
         try:
-            cli_context.app_manager.start(config)
+            return_code = cli_context.app_manager.start(config)
+            if return_code != 0 and verbose:
+                click.echo(f"⚠️  Desktop app exited with code: {return_code}")
         except KeyboardInterrupt:
-            click.echo("\n🛑 Stream interrupted by user")
-            if cli_context.app_manager:
-                cli_context.app_manager.stop()
-            raise
+            # Don't call cleanup here - let the global signal handler handle it
+            # This prevents double cleanup which causes the infinite loop
+            pass
         
     except SessionNotFoundError as e:
         click.echo(f"❌ {e}", err=True)

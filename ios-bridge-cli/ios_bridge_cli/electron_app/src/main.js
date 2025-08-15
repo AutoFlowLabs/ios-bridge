@@ -242,11 +242,23 @@ class IOSBridgeApp {
         
         console.log(`Creating window content size: ${scaledContentWidth}x${scaledContentHeight}, window size: ${windowWidth}x${windowHeight}`);
         
+        // Set icon based on platform
+        let icon;
+        if (process.platform === 'win32') {
+            icon = path.join(__dirname, '..', 'assets', 'icons', 'icon.ico');
+        } else if (process.platform === 'darwin') {
+            icon = path.join(__dirname, '..', 'assets', 'icons', 'icon.icns');
+        } else {
+            // Linux and other platforms
+            icon = path.join(__dirname, '..', 'assets', 'icons', 'icon.png');
+        }
+
         this.mainWindow = new BrowserWindow({
             width: windowWidth,
             height: windowHeight,
             // Removed fixed min sizes so programmatic resizes (e.g., on rotation) can shrink window
             resizable: false, // prevent user from resizing beyond device frame
+            icon: icon,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
