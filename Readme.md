@@ -669,6 +669,42 @@ MIT License - see LICENSE file for details.
 - 📖 **Documentation**: [Project Wiki](https://github.com/AutoFlowLabs/ios-bridge/wiki)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/AutoFlowLabs/ios-bridge/discussions)
 
+## Project Status & Contributing
+
+### 🚧 Development Phase
+
+This project is currently in **active development** with continuous improvements being made. While iOS Bridge provides a solid foundation for iOS simulator remote control, we're aware that the streaming quality (both WebRTC and WebSocket) is not yet at the level we envision.
+
+**Current Focus Areas:**
+- 🎥 **Streaming Quality Optimization** - Improving video quality, reducing latency, and enhancing performance
+- 🚀 **WebRTC Enhancement** - Better codec selection, adaptive bitrate, and connection stability  
+- 📡 **WebSocket Streaming** - Frame rate optimization and quality improvements
+- 🛠️ **Performance Tuning** - Memory usage, CPU optimization, and resource management
+
+### 🤝 Contributors Welcome!
+
+We especially welcome contributions in **streaming technology**! If you have experience with:
+- Video streaming protocols (WebRTC, WebSocket)
+- Video encoding/decoding optimization
+- Real-time communication systems
+- iOS Simulator integration improvements
+- Cross-platform performance optimization
+
+Your expertise could make a significant impact on this project. Whether it's code contributions, performance insights, or architectural suggestions - we'd love to collaborate!
+
+**How to Contribute:**
+1. Check out our [GitHub Issues](https://github.com/AutoFlowLabs/ios-bridge/issues) for open tasks
+2. Fork the repository and submit pull requests
+3. Share your streaming optimization ideas in [Discussions](https://github.com/AutoFlowLabs/ios-bridge/discussions)
+4. Help improve documentation and user experience
+
+### 🙏 Acknowledgments
+
+**Special Thanks:**
+- **[Claude Code](https://claude.ai/code)** - For exceptional assistance with documentation, code structure improvements, and being an invaluable development companion throughout this project
+- **The Open Source Community** - For inspiration, tools, and the collaborative spirit that makes projects like this possible
+- **All Contributors** - Past, present, and future contributors who help make iOS Bridge better
+
 ---
 
-**Getting Started**: `pip install ios-bridge-cli && ios-bridge create "iPhone 15 Pro" "17.0" --wait && ios-bridge stream`
+**Getting Started**: `pip install ios-bridge-cli && ios-bridge create "iPhone 15 Pro" "18.2" --wait && ios-bridge stream`
