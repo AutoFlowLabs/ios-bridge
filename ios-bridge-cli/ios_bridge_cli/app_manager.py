@@ -110,33 +110,89 @@ class ElectronAppManager:
     
     def _get_app_executable_path(self) -> Path:
         """Get the path to the executable app"""
+        # First try to find any existing version
+        desktop_apps_dir = self.app_cache_dir / "desktop-apps"
+        if desktop_apps_dir.exists():
+            for version_dir in desktop_apps_dir.iterdir():
+                if version_dir.is_dir() and version_dir.name.startswith("v"):
+                    app_path = self._get_app_path_for_version(version_dir)
+                    if app_path.exists():
+                        return app_path
+        
+        # Fallback to current version
         app_dir = self.app_cache_dir / "desktop-apps" / f"v{self.current_version}"
+        return self._get_app_path_for_version(app_dir)
+    
+    def _get_app_path_for_version(self, app_dir: Path) -> Path:
+        """Get app path for a specific version directory"""
         system = platform.system()
         
         if system == "Darwin":
-            return app_dir / "iOS Bridge.app"
+            # Try different possible locations for macOS
+            possible_paths = [
+                app_dir / "iOS Bridge.app",
+                app_dir / "mac-arm64" / "iOS Bridge.app",
+                app_dir / "mac-x64" / "iOS Bridge.app",
+            ]
         elif system == "Windows":
-            return app_dir / "iOS Bridge.exe"
+            # Try different possible locations for Windows
+            possible_paths = [
+                app_dir / "iOS Bridge.exe", 
+                app_dir / "win-unpacked" / "iOS Bridge.exe",
+                app_dir / "win-ia32-unpacked" / "iOS Bridge.exe",
+            ]
         else:  # Linux
-            return app_dir / "ios-bridge-desktop"
+            # Try different possible locations for Linux
+            possible_paths = [
+                app_dir / "ios-bridge-desktop",
+                app_dir / "linux-unpacked" / "ios-bridge-desktop",
+                app_dir / "linux-x64-unpacked" / "ios-bridge-desktop",
+            ]
+        
+        # Return the first path that exists
+        for path in possible_paths:
+            if path.exists():
+                return path
+        
+        # Return the default if none exist
+        return possible_paths[0]
     
     def _app_exists_and_valid(self) -> bool:
-        """Check if the app exists and is valid for current version"""
+        """Check if the app exists and is valid"""
         app_path = self._get_app_executable_path()
         
         if not app_path.exists():
+            if self.verbose:
+                print(f"🔍 App not found at: {app_path}")
             return False
         
-        # Check version file
+        # Check if executable is actually executable
+        if not os.access(app_path, os.X_OK):
+            if self.verbose:
+                print(f"🔍 App not executable: {app_path}")
+            return False
+        
+        # Check version file exists (but don't require exact match)
         version_file = app_path.parent / ".version"
         if not version_file.exists():
+            if self.verbose:
+                print(f"🔍 No version file at: {version_file}")
             return False
         
         try:
             with open(version_file, 'r') as f:
                 cached_version = f.read().strip()
-            return cached_version == self.current_version
+            
+            # Allow any valid version (don't force exact CLI version match)
+            # This prevents re-downloading when CLI version != app version
+            if cached_version and len(cached_version.split('.')) >= 2:
+                if self.verbose:
+                    print(f"✅ Found valid app version: {cached_version}")
+                return True
+            return False
         except:
+            if self.verbose:
+                print(f"🔍 Could not read version file")
             return False
     
     def _download_with_progress(self, url: str, dest_path: Path, description: str):
@@ -167,7 +223,7 @@ class ElectronAppManager:
         if self.verbose:
             print(f"✅ Download completed: {dest_path}")
     
-    def _extract_app(self, archive_path: Path, extract_to: Path):
+    def _extract_app(self, archive_path: Path, extract_to: Path, version: str = None):
         """Extract downloaded app archive"""
         if self.verbose:
             print(f"📦 Extracting {archive_path.name}...")
@@ -185,8 +241,29 @@ class ElectronAppManager:
         
         # Write version file
         version_file = extract_to / ".version"
+        version_to_write = version or self.current_version
         with open(version_file, 'w') as f:
-            f.write(self.current_version)
+            f.write(version_to_write)
+        
+        # Make Linux/macOS executables executable
+        system, _ = self._get_platform_info()
+        if system in ["Linux", "Darwin"]:
+            # Find and make executables executable
+            for item in extract_to.rglob("*"):
+                if item.is_file() and (
+                    item.name.startswith("ios-bridge-desktop") or
+                    item.suffix == ".app" or
+                    "iOS Bridge" in str(item)
+                ):
+                    try:
+                        import stat
+                        current_permissions = item.stat().st_mode
+                        item.chmod(current_permissions | stat.S_IEXEC | stat.S_IXUSR | stat.S_IXGRP)
+                        if self.verbose:
+                            print(f"🔧 Made executable: {item}")
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"⚠️  Could not make {item} executable: {e}")
         
         if self.verbose:
             print(f"✅ Extraction completed")
@@ -195,20 +272,34 @@ class ElectronAppManager:
         """Get the latest release information from GitHub"""
         try:
             # Try to get the latest release from GitHub API
-            response = requests.get(f"{self.GITHUB_API_URL}/releases/latest", timeout=10)
+            api_url = f"{self.GITHUB_API_URL}/releases/latest"
+            if self.verbose:
+                print(f"🔗 Fetching latest release from: {api_url}")
+            
+            response = requests.get(api_url, timeout=10)
             response.raise_for_status()
-            return response.json()
+            
+            release_data = response.json()
+            if self.verbose:
+                print(f"✅ Found latest release: {release_data.get('tag_name', 'Unknown')}")
+            
+            return release_data
         except requests.RequestException as e:
             if self.verbose:
-                print(f"⚠️  Failed to fetch latest release, using fallback: {e}")
+                print(f"⚠️  Failed to fetch latest release from GitHub API: {e}")
+                print(f"🔗 Attempted URL: {self.GITHUB_API_URL}/releases/latest")
             
-            # Fallback to known working release
+            # Fallback to current CLI version
+            fallback_version = self.current_version
+            if self.verbose:
+                print(f"🔄 Using fallback version: v{fallback_version}")
+            
             return {
-                "tag_name": "v1.0.2",  # Use last known working release
+                "tag_name": f"v{fallback_version}",
                 "assets": [
                     {
                         "name": self._get_app_binary_name(),
-                        "browser_download_url": f"https://github.com/{self.GITHUB_REPO}/releases/download/v1.0.2/{self._get_app_binary_name()}"
+                        "browser_download_url": f"https://github.com/{self.GITHUB_REPO}/releases/download/v{fallback_version}/{self._get_app_binary_name()}"
                     }
                 ]
             }
@@ -218,6 +309,9 @@ class ElectronAppManager:
         try:
             release = self._get_latest_release()
             binary_name = self._get_app_binary_name()
+            
+            # Get version from release
+            release_version = release.get("tag_name", f"v{self.current_version}").lstrip("v")
             
             # Find the asset for our platform
             asset_url = None
@@ -240,12 +334,12 @@ class ElectronAppManager:
                 f"Downloading iOS Bridge Desktop for {platform.system()}"
             )
             
-            # Extract to app directory
-            app_dir = self.app_cache_dir / "desktop-apps" / f"v{self.current_version}"
+            # Extract to app directory using the actual release version
+            app_dir = self.app_cache_dir / "desktop-apps" / f"v{release_version}"
             if app_dir.exists():
                 shutil.rmtree(app_dir)
             
-            self._extract_app(archive_path, app_dir)
+            self._extract_app(archive_path, app_dir, release_version)
             
             # Make executable on Unix systems
             if platform.system() in ["Linux", "Darwin"]:
@@ -366,8 +460,17 @@ class ElectronAppManager:
                 return_code = self.process.wait()
             except KeyboardInterrupt:
                 if self.verbose:
-                    print("\n🛑 Stopping iOS Bridge Desktop...")
+                    print("\n🛑 Ctrl+C detected, stopping iOS Bridge Desktop...")
                 self.stop()
+                
+                # Give the process time to cleanup before forcing exit
+                try:
+                    self.process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    if self.verbose:
+                        print("🛑 Force terminating desktop app...")
+                    self.process.kill()
+                
                 return 0
             
             if return_code != 0 and self.verbose:
