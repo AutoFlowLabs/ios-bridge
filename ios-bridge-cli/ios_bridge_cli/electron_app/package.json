@@ -1,6 +1,6 @@
 {
   "name": "ios-bridge-desktop",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Desktop streaming client for iOS Bridge",
   "main": "src/main.js",
   "scripts": {
