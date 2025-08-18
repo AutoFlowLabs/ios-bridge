@@ -286,6 +286,56 @@ def check_server_command_available():
         click.echo("💡 The iOS Bridge server requires macOS and Xcode/iOS Simulator")
         click.echo("🌐 To connect to a remote server, use: --server https://your-server.com", err=True)
         sys.exit(1)
+    
+    # Check system dependencies
+    missing_deps = []
+    
+    # Check Xcode Command Line Tools
+    try:
+        result = subprocess.run(['xcode-select', '-p'], capture_output=True, text=True)
+        if result.returncode != 0:
+            missing_deps.append("xcode_tools")
+    except FileNotFoundError:
+        missing_deps.append("xcode_tools")
+    
+    # Check idb-companion
+    try:
+        result = subprocess.run(['which', 'idb_companion'], capture_output=True, text=True)
+        if result.returncode != 0:
+            missing_deps.append("idb_companion")
+    except FileNotFoundError:
+        missing_deps.append("idb_companion")
+    
+    # Check fb-idb Python package
+    try:
+        import idb
+    except ImportError:
+        missing_deps.append("fb_idb")
+    
+    if missing_deps:
+        click.echo("⚠️  Missing system dependencies for iOS Bridge server:", err=True)
+        click.echo()
+        
+        if "xcode_tools" in missing_deps:
+            click.echo("❌ Xcode Command Line Tools not found")
+            click.echo("   Install: xcode-select --install")
+            click.echo()
+        
+        if "idb_companion" in missing_deps:
+            click.echo("❌ idb-companion not found")
+            click.echo("   Install: brew tap facebook/fb && brew install idb-companion") 
+            click.echo()
+        
+        if "fb_idb" in missing_deps:
+            click.echo("❌ fb-idb Python package not found")
+            click.echo("   Install: pip install 'ios-bridge-cli[server]' --upgrade")
+            click.echo("   # or manually: pip install fb-idb")
+            click.echo()
+        
+        click.echo("🚀 After installing dependencies, the server will be ready to use!")
+        click.echo("💡 These are one-time setup requirements for hosting iOS Bridge server.")
+        click.echo("🌐 For client-only usage (stream, connect), these dependencies are not needed.")
+        sys.exit(1)
 
 
 @cli.command()
