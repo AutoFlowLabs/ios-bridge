@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ios-bridge-cli"
-version = "1.0.8"
+version = "1.0.9"
 description = "Desktop streaming client for iOS Bridge simulator sessions with Electron app integration"
 readme = "README.md"
 license = {text = "MIT"}
@@ -42,6 +42,12 @@ dependencies = [
     "uvicorn>=0.23.0",
     "pydantic>=2.0.0",
     "starlette>=0.27.0",
+    "python-multipart>=0.0.6",
+    "opencv-python>=4.5.0",
+    "numpy>=1.21.0",
+    "av>=10.0.0",
+    "jinja2>=3.0.0",
+    "aiortc>=1.6.0",
 ]
 
 [project.optional-dependencies]
