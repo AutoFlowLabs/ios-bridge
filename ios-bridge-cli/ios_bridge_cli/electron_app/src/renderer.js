@@ -71,6 +71,13 @@ class IOSBridgeRenderer {
             deviceName.textContent = `${deviceType} ${iosVersion}`.trim();
         }
         
+        // Initialize stream mode indicator
+        const streamModeIndicator = document.getElementById('stream-mode-indicator');
+        if (streamModeIndicator) {
+            streamModeIndicator.textContent = 'WebSocket';
+            streamModeIndicator.className = 'websocket';
+        }
+        
         // Set device and stream dimensions from config
         const sessionInfo = this.config?.sessionInfo || {};
         if (sessionInfo.device_width && sessionInfo.device_height) {
@@ -752,6 +759,7 @@ class IOSBridgeRenderer {
         // Update UI immediately
         const streamModeLabel = document.getElementById('stream-mode-label');
         const streamModeBtn = document.getElementById('stream-mode-btn');
+        const streamModeIndicator = document.getElementById('stream-mode-indicator');
         
         if (streamModeLabel) {
             streamModeLabel.textContent = this.streamMode === 'webrtc' ? 'WebRTC' : 'WebSocket';
@@ -768,6 +776,13 @@ class IOSBridgeRenderer {
             }
         }
         
+        // Update footer stream mode indicator
+        if (streamModeIndicator) {
+            streamModeIndicator.textContent = this.streamMode === 'webrtc' ? 'WebRTC' : 'WebSocket';
+            streamModeIndicator.className = this.streamMode === 'webrtc' ? 'webrtc' : 'websocket';
+            console.log(`✅ Updated footer indicator to: ${streamModeIndicator.textContent}`);
+        }
+        
         // Show visual feedback about the mode switch
         if (this.streamMode === 'webrtc') {
             this.showStatus('🚀 Switching to WebRTC mode - Lower latency, real-time streaming', 3000);
@@ -782,6 +797,27 @@ class IOSBridgeRenderer {
             setTimeout(() => {
                 this.connect();
             }, 1000);
+        }
+    }
+    
+    refreshStream() {
+        console.log('🔄 Refreshing stream connection...');
+        this.showStatus('🔄 Refreshing stream...', 2000);
+        
+        if (this.isConnected) {
+            this.disconnect();
+            setTimeout(() => {
+                this.connect().catch(error => {
+                    console.error('Failed to refresh stream:', error);
+                    this.showError('Failed to refresh stream connection');
+                });
+            }, 500);
+        } else {
+            // If not connected, try to connect
+            this.connect().catch(error => {
+                console.error('Failed to connect stream:', error);
+                this.showError('Failed to connect to stream');
+            });
         }
     }
     
@@ -1044,6 +1080,10 @@ class IOSBridgeRenderer {
                 e.preventDefault();
                 this.handleDeviceAction('toggle-stream');
                 break;
+            case 'F8':
+                e.preventDefault();
+                this.handleDeviceAction('refresh');
+                break;
         }
     }
     
@@ -1131,6 +1171,9 @@ class IOSBridgeRenderer {
                 break;
             case 'toggle-stream':
                 this.toggleStreamMode();
+                break;
+            case 'refresh':
+                this.refreshStream();
                 break;
         }
     }
@@ -1396,11 +1439,13 @@ class IOSBridgeRenderer {
         const keyboardSection = document.getElementById('keyboard-section');
         const keyboardBtn = document.getElementById('keyboard-btn');
         const keyboardInput = document.getElementById('keyboard-input');
+        const mainContent = document.querySelector('.main-content');
         
         if (this.keyboardMode) {
             keyboardSection.style.display = 'block';
             keyboardBtn.classList.add('keyboard-active');
-            keyboardBtn.title = 'Hide Keyboard (F4)';
+            keyboardBtn.title = 'Hide Virtual Keyboard (F4)';
+            mainContent.classList.add('keyboard-open');
             // Focus the input field
             setTimeout(() => {
                 keyboardInput?.focus();
@@ -1408,7 +1453,8 @@ class IOSBridgeRenderer {
         } else {
             keyboardSection.style.display = 'none';
             keyboardBtn.classList.remove('keyboard-active');
-            keyboardBtn.title = 'Toggle Keyboard (F4)';
+            keyboardBtn.title = 'Toggle Virtual Keyboard (F4)';
+            mainContent.classList.remove('keyboard-open');
         }
     }
     

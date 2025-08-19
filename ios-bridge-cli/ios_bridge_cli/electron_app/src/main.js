@@ -304,13 +304,15 @@ class IOSBridgeApp {
         const headerHeight = 48;  // Header height from CSS
         const footerHeight = 32;  // Footer height from CSS
         const shellPadding = 20;  // 10px on all sides in styles.css
+        const containerPadding = 40; // 20px on all sides for device-container
+        const extraMargin = 40;   // Extra margin to ensure full visibility
         
         // Apply scaling factor to fit within monitor size (consider both width and height)
         const maxScaleCap = 1.0; // allow up to 100% of base size but no upscaling
-        const availableWidth = Math.max(200, workWidth - 40); // leave some margin
-        const availableHeight = Math.max(200, workHeight - (headerHeight + footerHeight) - 60);
-        const scaleByWidth = availableWidth / (baseWidth + shellPadding);
-        const scaleByHeight = availableHeight / (baseHeight + shellPadding);
+        const availableWidth = Math.max(200, workWidth - extraMargin); // leave margin
+        const availableHeight = Math.max(200, workHeight - (headerHeight + footerHeight + containerPadding + shellPadding + extraMargin));
+        const scaleByWidth = availableWidth / (baseWidth + shellPadding + containerPadding);
+        const scaleByHeight = availableHeight / baseHeight;
         const scaleFactor = Math.max(0.1, Math.min(maxScaleCap, scaleByWidth, scaleByHeight));
         
         // Apply the scale factor
@@ -319,9 +321,9 @@ class IOSBridgeApp {
         
         console.log(`Original stream/base dimensions: ${baseWidth}x${baseHeight}, Scaled content: ${scaledContentWidth}x${scaledContentHeight} (scale: ${scaleFactor.toFixed(2)})`);
         
-        // Calculate exact window size to match device display area + chrome
-        const windowWidth = scaledContentWidth + shellPadding; // add horizontal shell padding
-        const windowHeight = scaledContentHeight + shellPadding + headerHeight + footerHeight;
+        // Calculate exact window size to match device display area + chrome + padding
+        const windowWidth = scaledContentWidth + shellPadding + containerPadding + 10; // add all padding + extra space
+        const windowHeight = scaledContentHeight + shellPadding + containerPadding + headerHeight + footerHeight + 10; // add extra space for full visibility
         
         console.log(`Creating window content size: ${scaledContentWidth}x${scaledContentHeight}, window size: ${windowWidth}x${windowHeight}`);
         
