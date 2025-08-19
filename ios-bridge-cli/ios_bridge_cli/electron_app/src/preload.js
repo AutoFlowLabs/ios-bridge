@@ -30,5 +30,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Remove listeners
     removeAllListeners: (channel) => {
         ipcRenderer.removeAllListeners(channel);
-    }
+    },
+    
+    // File dialogs
+    showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),
+    readFile: (filePath) => ipcRenderer.invoke('read-file', filePath)
 });

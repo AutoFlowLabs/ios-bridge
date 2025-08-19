@@ -4,6 +4,7 @@ import subprocess
 import time
 import zipfile
 from fastapi import APIRouter, HTTPException, Response, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from typing import List, Optional
 import tempfile
 import os
@@ -128,6 +129,13 @@ async def install_app(
         if not session_manager.get_session(session_id):
             raise HTTPException(status_code=404, detail="Session not found")
         
+        # Log received files for debugging
+        logger.info(f"Install app request - ipa_file: {ipa_file}, app_bundle: {app_bundle}")
+        if ipa_file:
+            logger.info(f"IPA file received - filename: {ipa_file.filename}, content_type: {ipa_file.content_type}, size: {ipa_file.size if hasattr(ipa_file, 'size') else 'unknown'}")
+        if app_bundle:
+            logger.info(f"App bundle received - filename: {app_bundle.filename}, content_type: {app_bundle.content_type}, size: {app_bundle.size if hasattr(app_bundle, 'size') else 'unknown'}")
+        
         # Determine which file was uploaded
         if ipa_file and ipa_file.filename:
             uploaded_file = ipa_file
@@ -136,6 +144,7 @@ async def install_app(
             uploaded_file = app_bundle  
             file_type = 'zip'
         else:
+            logger.warning("No file uploaded - both ipa_file and app_bundle are None or have no filename")
             raise HTTPException(status_code=400, detail="No file uploaded")
         
         # Create temporary directory for processing

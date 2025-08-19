@@ -1,7 +1,7 @@
 // Suppress Electron security warnings in production
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 
-const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -283,6 +283,33 @@ class IOSBridgeApp {
                 };
             }
             return { error: 'no_window' };
+        });
+        
+        ipcMain.handle('show-open-dialog', async (event, options) => {
+            if (this.mainWindow) {
+                const result = await dialog.showOpenDialog(this.mainWindow, options);
+                return result;
+            }
+            return { canceled: true };
+        });
+        
+        ipcMain.handle('read-file', async (event, filePath) => {
+            try {
+                const data = fs.readFileSync(filePath);
+                const fileName = path.basename(filePath);
+                return {
+                    success: true,
+                    data: data.toString('base64'),
+                    fileName: fileName,
+                    size: data.length
+                };
+            } catch (error) {
+                console.error('Error reading file:', error);
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
         });
     }
     

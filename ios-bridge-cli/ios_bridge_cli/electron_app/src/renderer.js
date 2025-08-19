@@ -20,6 +20,9 @@ class IOSBridgeRenderer {
         this.realtimeMode = false;
         this.isRecording = false;
         
+        // File selection for app install
+        this.selectedFile = null;
+        
         // WebRTC properties
         this.streamMode = 'websocket'; // 'websocket' or 'webrtc'
         this.peerConnection = null;
@@ -1823,6 +1826,7 @@ class IOSBridgeRenderer {
     
     resetAppInstallModal() {
         // Reset file selection
+        this.selectedFile = null;
         const fileInput = document.getElementById('app-file-input');
         const fileSelected = document.getElementById('file-selected');
         const uploadPlaceholder = document.querySelector('.upload-placeholder');
@@ -1843,11 +1847,21 @@ class IOSBridgeRenderer {
         const fileUploadArea = document.getElementById('file-upload-area');
         const fileInput = document.getElementById('app-file-input');
         
-        if (fileUploadArea && fileInput) {
-            fileUploadArea.onclick = () => fileInput.click();
+        if (fileUploadArea) {
+            fileUploadArea.onclick = async () => {
+                if (window.electronAPI && window.electronAPI.showOpenDialog) {
+                    // Use Electron dialog
+                    await this.showElectronFileDialog();
+                } else {
+                    // Fallback to HTML file input for browser environments
+                    if (fileInput) {
+                        fileInput.click();
+                    }
+                }
+            };
         }
         
-        // File input change
+        // File input change (for browser fallback)
         if (fileInput) {
             fileInput.onchange = (e) => this.handleFileSelection(e);
         }
@@ -1875,8 +1889,68 @@ class IOSBridgeRenderer {
         }
     }
     
-    handleFileSelection(event) {
-        const file = event.target.files[0];
+    async showElectronFileDialog() {
+        try {
+            const result = await window.electronAPI.showOpenDialog({
+                title: 'Select iOS App File',
+                filters: [
+                    { name: 'iOS Applications', extensions: ['ipa', 'zip'] },
+                    { name: 'All Files', extensions: ['*'] }
+                ],
+                properties: ['openFile']
+            });
+            
+            if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+                const filePath = result.filePaths[0];
+                console.log('Selected file path:', filePath);
+                
+                // Read the file using IPC
+                try {
+                    const fileResult = await window.electronAPI.readFile(filePath);
+                    if (fileResult.success) {
+                        // Convert base64 data back to binary
+                        const binaryString = atob(fileResult.data);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        
+                        // Create a File object
+                        const blob = new Blob([bytes]);
+                        const file = new File([blob], fileResult.fileName, { 
+                            type: this.getMimeType(fileResult.fileName)
+                        });
+                        
+                        // Handle the file selection
+                        this.handleFileSelectionDirect(file);
+                    } else {
+                        console.error('Error reading file:', fileResult.error);
+                        alert('Error reading selected file: ' + fileResult.error);
+                    }
+                } catch (error) {
+                    console.error('Error reading file:', error);
+                    alert('Error reading selected file. Please try again.');
+                }
+            }
+        } catch (error) {
+            console.error('Error showing file dialog:', error);
+            alert('Error opening file dialog. Please try again.');
+        }
+    }
+    
+    getMimeType(filename) {
+        const extension = filename.toLowerCase().split('.').pop();
+        switch (extension) {
+            case 'ipa':
+                return 'application/octet-stream';
+            case 'zip':
+                return 'application/zip';
+            default:
+                return 'application/octet-stream';
+        }
+    }
+    
+    handleFileSelectionDirect(file) {
         if (!file) return;
         
         // Validate file type
@@ -1885,11 +1959,18 @@ class IOSBridgeRenderer {
         
         if (!validExtensions.includes(fileExtension)) {
             alert('Please select a valid .ipa or .zip file');
-            event.target.value = '';
             return;
         }
         
+        // Store the file reference for later use
+        this.selectedFile = file;
+        
         // Update UI to show selected file
+        this.updateFileSelectionUI(file);
+    }
+    
+    
+    updateFileSelectionUI(file) {
         const fileSelected = document.getElementById('file-selected');
         const uploadPlaceholder = document.querySelector('.upload-placeholder');
         const selectedFileName = document.getElementById('selected-file-name');
@@ -1906,10 +1987,37 @@ class IOSBridgeRenderer {
         if (installBtn) installBtn.disabled = false;
         if (installLaunchBtn) installLaunchBtn.disabled = false;
     }
+
+    handleFileSelection(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        // Validate file type
+        const validExtensions = ['.ipa', '.zip'];
+        const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        
+        if (!validExtensions.includes(fileExtension)) {
+            alert('Please select a valid .ipa or .zip file');
+            event.target.value = '';
+            return;
+        }
+        
+        // Store the file reference for later use
+        this.selectedFile = file;
+        
+        // Update UI
+        this.updateFileSelectionUI(file);
+    }
     
     async installApp(launchAfterInstall = false) {
-        const fileInput = document.getElementById('app-file-input');
-        const file = fileInput?.files[0];
+        // Get file from either stored reference (Electron) or file input (browser)
+        let file;
+        if (this.selectedFile) {
+            file = this.selectedFile;
+        } else {
+            const fileInput = document.getElementById('app-file-input');
+            file = fileInput?.files[0];
+        }
         
         if (!file) {
             alert('Please select a file first');
@@ -1928,15 +2036,36 @@ class IOSBridgeRenderer {
         this.showInstallProgress();
         
         try {
-            // Create form data
+            // Create form data with correct field names based on file type
             const formData = new FormData();
-            formData.append('file', file);
+            const fileExtension = file.name.toLowerCase().split('.').pop();
+            
+            // Determine field name based on file extension
+            let fieldName;
+            if (fileExtension === 'ipa') {
+                fieldName = 'ipa_file';
+                formData.append('ipa_file', file);
+            } else if (fileExtension === 'zip') {
+                fieldName = 'app_bundle';
+                formData.append('app_bundle', file);
+            } else {
+                // Default to zip for unknown extensions
+                fieldName = 'app_bundle';
+                formData.append('app_bundle', file);
+            }
             
             // Determine endpoint based on launch option
             const endpoint = launchAfterInstall ? 'install-and-launch' : 'install';
             const url = `${serverUrl}/api/sessions/${sessionId}/apps/${endpoint}`;
             
-            console.log(`Installing app via ${endpoint} endpoint...`);
+            console.log(`Installing app via ${endpoint} endpoint with file type: ${fileExtension}, field name: ${fieldName}, file size: ${file.size} bytes`);
+            console.log(`URL: ${url}`);
+            console.log(`File object:`, file);
+            
+            // Validate file exists and has content
+            if (!file.size || file.size === 0) {
+                throw new Error('Selected file is empty');
+            }
             
             // Make request
             const response = await fetch(url, {
