@@ -1084,6 +1084,10 @@ class IOSBridgeRenderer {
                 e.preventDefault();
                 this.handleDeviceAction('refresh');
                 break;
+            case 'F9':
+                e.preventDefault();
+                this.handleDeviceAction('import-app');
+                break;
         }
     }
     
@@ -1174,6 +1178,9 @@ class IOSBridgeRenderer {
                 break;
             case 'refresh':
                 this.refreshStream();
+                break;
+            case 'import-app':
+                this.showAppInstallModal();
                 break;
         }
     }
@@ -1796,6 +1803,222 @@ class IOSBridgeRenderer {
             recordBtn.classList.remove('recording');
             stopRecordBtn.style.display = 'none';
             stopRecordBtn.classList.remove('recording');
+        }
+    }
+    
+    // App Installation functionality
+    showAppInstallModal() {
+        const modal = document.getElementById('app-install-modal');
+        if (!modal) return;
+        
+        // Reset modal state
+        this.resetAppInstallModal();
+        
+        // Show modal
+        modal.classList.add('show');
+        
+        // Setup modal event listeners
+        this.setupAppInstallEventListeners();
+    }
+    
+    resetAppInstallModal() {
+        // Reset file selection
+        const fileInput = document.getElementById('app-file-input');
+        const fileSelected = document.getElementById('file-selected');
+        const uploadPlaceholder = document.querySelector('.upload-placeholder');
+        const installBtn = document.getElementById('install-btn');
+        const installLaunchBtn = document.getElementById('install-launch-btn');
+        const progressSection = document.getElementById('install-progress');
+        
+        if (fileInput) fileInput.value = '';
+        if (fileSelected) fileSelected.style.display = 'none';
+        if (uploadPlaceholder) uploadPlaceholder.style.display = 'block';
+        if (installBtn) installBtn.disabled = true;
+        if (installLaunchBtn) installLaunchBtn.disabled = true;
+        if (progressSection) progressSection.style.display = 'none';
+    }
+    
+    setupAppInstallEventListeners() {
+        // File upload area click
+        const fileUploadArea = document.getElementById('file-upload-area');
+        const fileInput = document.getElementById('app-file-input');
+        
+        if (fileUploadArea && fileInput) {
+            fileUploadArea.onclick = () => fileInput.click();
+        }
+        
+        // File input change
+        if (fileInput) {
+            fileInput.onchange = (e) => this.handleFileSelection(e);
+        }
+        
+        // Install buttons
+        const installBtn = document.getElementById('install-btn');
+        const installLaunchBtn = document.getElementById('install-launch-btn');
+        
+        if (installBtn) {
+            installBtn.onclick = () => this.installApp(false);
+        }
+        
+        if (installLaunchBtn) {
+            installLaunchBtn.onclick = () => this.installApp(true);
+        }
+        
+        // Modal close
+        const modal = document.getElementById('app-install-modal');
+        if (modal) {
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    this.closeAppInstallModal();
+                }
+            };
+        }
+    }
+    
+    handleFileSelection(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        // Validate file type
+        const validExtensions = ['.ipa', '.zip'];
+        const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        
+        if (!validExtensions.includes(fileExtension)) {
+            alert('Please select a valid .ipa or .zip file');
+            event.target.value = '';
+            return;
+        }
+        
+        // Update UI to show selected file
+        const fileSelected = document.getElementById('file-selected');
+        const uploadPlaceholder = document.querySelector('.upload-placeholder');
+        const selectedFileName = document.getElementById('selected-file-name');
+        const installBtn = document.getElementById('install-btn');
+        const installLaunchBtn = document.getElementById('install-launch-btn');
+        
+        if (fileSelected && uploadPlaceholder && selectedFileName) {
+            uploadPlaceholder.style.display = 'none';
+            fileSelected.style.display = 'flex';
+            selectedFileName.textContent = file.name;
+        }
+        
+        // Enable install buttons
+        if (installBtn) installBtn.disabled = false;
+        if (installLaunchBtn) installLaunchBtn.disabled = false;
+    }
+    
+    async installApp(launchAfterInstall = false) {
+        const fileInput = document.getElementById('app-file-input');
+        const file = fileInput?.files[0];
+        
+        if (!file) {
+            alert('Please select a file first');
+            return;
+        }
+        
+        const sessionId = this.config?.sessionId;
+        const serverUrl = this.config?.serverUrl;
+        
+        if (!sessionId || !serverUrl) {
+            alert('Missing session information');
+            return;
+        }
+        
+        // Show progress
+        this.showInstallProgress();
+        
+        try {
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Determine endpoint based on launch option
+            const endpoint = launchAfterInstall ? 'install-and-launch' : 'install';
+            const url = `${serverUrl}/api/sessions/${sessionId}/apps/${endpoint}`;
+            
+            console.log(`Installing app via ${endpoint} endpoint...`);
+            
+            // Make request
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('App installation successful:', result);
+                
+                // Update progress to completion
+                this.updateInstallProgress(100, launchAfterInstall ? 'App installed and launched successfully!' : 'App installed successfully!');
+                
+                // Close modal after delay
+                setTimeout(() => {
+                    this.closeAppInstallModal();
+                }, 2000);
+                
+            } else {
+                const errorText = await response.text();
+                console.error('App installation failed:', response.status, errorText);
+                alert(`Installation failed: ${response.status} - ${errorText}`);
+                this.hideInstallProgress();
+            }
+            
+        } catch (error) {
+            console.error('Error installing app:', error);
+            alert(`Installation error: ${error.message}`);
+            this.hideInstallProgress();
+        }
+    }
+    
+    showInstallProgress() {
+        const progressSection = document.getElementById('install-progress');
+        const installBtn = document.getElementById('install-btn');
+        const installLaunchBtn = document.getElementById('install-launch-btn');
+        
+        if (progressSection) progressSection.style.display = 'block';
+        if (installBtn) installBtn.disabled = true;
+        if (installLaunchBtn) installLaunchBtn.disabled = true;
+        
+        // Start progress animation
+        this.updateInstallProgress(20, 'Uploading app file...');
+        
+        setTimeout(() => {
+            this.updateInstallProgress(60, 'Installing app on device...');
+        }, 1000);
+    }
+    
+    updateInstallProgress(percent, message) {
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        
+        if (progressFill) {
+            progressFill.style.width = `${percent}%`;
+        }
+        
+        if (progressText) {
+            progressText.textContent = message;
+        }
+    }
+    
+    hideInstallProgress() {
+        const progressSection = document.getElementById('install-progress');
+        const installBtn = document.getElementById('install-btn');
+        const installLaunchBtn = document.getElementById('install-launch-btn');
+        const fileInput = document.getElementById('app-file-input');
+        
+        if (progressSection) progressSection.style.display = 'none';
+        
+        // Re-enable buttons if file is selected
+        if (fileInput?.files[0]) {
+            if (installBtn) installBtn.disabled = false;
+            if (installLaunchBtn) installLaunchBtn.disabled = false;
+        }
+    }
+    
+    closeAppInstallModal() {
+        const modal = document.getElementById('app-install-modal');
+        if (modal) {
+            modal.classList.remove('show');
         }
     }
 }

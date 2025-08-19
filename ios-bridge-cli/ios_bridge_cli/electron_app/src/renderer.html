@@ -114,6 +114,15 @@
                     </svg>
                 </button>
                 
+                <button id="import-app-btn" class="control-btn" data-action="import-app" title="Import App - Install IPA or ZIP files (F9)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                        <path d="M12,11L16,15H13V19H11V15H8L12,11Z"/>
+                    </svg>
+                </button>
+                
+                <div class="separator"></div>
+                
                 <button id="minimize-btn" class="control-btn" title="Minimize Window">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M6 19h12v2H6z"/>
@@ -189,6 +198,51 @@
             </div>
             <div class="modal-body" id="info-modal-body">
                 <!-- Device info will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- App Installation modal -->
+    <div id="app-install-modal" class="modal">
+        <div class="modal-content app-install-modal">
+            <div class="modal-header">
+                <h3>📱 Install Application</h3>
+                <button class="modal-close" onclick="closeModal('app-install-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="app-install-form">
+                    <div class="file-upload-area" id="file-upload-area">
+                        <input type="file" id="app-file-input" accept=".ipa,.zip" style="display: none;">
+                        <div class="upload-placeholder">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="#666">
+                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                <path d="M12,11L16,15H13V19H11V15H8L12,11Z"/>
+                            </svg>
+                            <p>Click to select IPA or ZIP file</p>
+                            <p class="file-types">Supported: .ipa (iOS apps), .zip (app bundles)</p>
+                        </div>
+                        <div class="file-selected" id="file-selected" style="display: none;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="#00aa00">
+                                <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"/>
+                            </svg>
+                            <span id="selected-file-name">No file selected</span>
+                        </div>
+                    </div>
+                    <div class="install-actions">
+                        <button id="install-btn" class="install-action-btn primary" disabled>
+                            📱 Install
+                        </button>
+                        <button id="install-launch-btn" class="install-action-btn secondary" disabled>
+                            🚀 Install & Launch
+                        </button>
+                    </div>
+                    <div class="install-progress" id="install-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <p id="progress-text">Installing...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
