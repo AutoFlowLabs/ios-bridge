@@ -91,6 +91,27 @@ ios-bridge info <session-id>
 ios-bridge terminate <session-id>
 ```
 
+### App Installation
+```bash
+# Install iOS app (.ipa or .zip) on simulator
+ios-bridge install-app /path/to/MyApp.ipa
+
+# Install and launch immediately (shows upload progress)
+ios-bridge install-app /path/to/MyApp.ipa --launch
+
+# Install on specific session (auto-detects if only one session)
+ios-bridge install-app /path/to/MyApp.zip <session-id> --launch
+
+# Skip confirmation prompt with visual progress
+ios-bridge install-app /path/to/MyApp.ipa --force
+```
+
+**Features:**
+- 📊 **Visual Progress Bar**: Real-time upload progress indicator
+- ⚙️ **Installation Status**: Clear feedback during processing
+- 🎯 **File Size Display**: Shows file size before upload
+- 🚀 **Launch Integration**: Automatic app launching after installation
+
 ### Streaming & Control
 ```bash
 # Stream session (auto-detects if only one session)

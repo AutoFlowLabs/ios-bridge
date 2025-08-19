@@ -86,6 +86,73 @@ ios-bridge screenshot a1b2c3d4e5f6 --output ~/Desktop/ios-screenshot.png
 ios-bridge screenshot a1b2c3d4e5f6 --server http://localhost:8000 --output device.png
 ```
 
+### 5. App Installation
+
+Install iOS apps (.ipa files) or app bundles (.zip files) directly onto simulator sessions:
+
+```bash
+# Install app on auto-detected session (if only one exists)
+ios-bridge install-app /path/to/MyApp.ipa
+
+# Install and launch immediately  
+ios-bridge install-app /path/to/MyApp.ipa --launch
+
+# Install on specific session
+ios-bridge install-app /path/to/MyApp.ipa a1b2c3d4e5f6
+
+# Install app bundle from ZIP file
+ios-bridge install-app /path/to/MyAppBundle.zip --launch
+
+# Skip confirmation prompts (useful for automation)
+ios-bridge install-app /path/to/MyApp.ipa --force --launch
+
+# With custom server
+ios-bridge install-app /path/to/MyApp.ipa --server http://localhost:8000 --launch
+```
+
+Example output:
+```
+📱 Installing app on iOS simulator:
+   App: MyApp.ipa (15.2 MB)
+   Device: iPhone 14 Pro iOS 16.0
+   Session: a1b2c3d4e5f6...
+   Action: Install and launch
+
+💡 Do you want to install and launch MyApp.ipa? [y/N]: y
+
+🚀 Installing and launching MyApp.ipa...
+📤 Uploading MyApp.ipa  [████████████████████████████████] 100%
+⚙️  Processing installation...
+✅ App installed and launched successfully!
+
+📋 App Details:
+   Name: My Awesome App
+   Bundle ID: com.company.myapp
+   Version: 1.0.0
+
+🚀 App launched:
+   Bundle ID: com.company.myapp
+   Process ID: 12345
+```
+
+**Progress Features:**
+- **Upload Progress Bar**: Visual progress indicator showing upload status
+- **File Size Display**: Shows file size in MB before upload
+- **Installation Phases**: Clear indicators for upload and installation phases
+- **Real-time Updates**: Progress bar updates smoothly during upload
+
+**Supported formats:**
+- `.ipa` files (iOS app archives)
+- `.zip` files (containing `.app` bundles)
+
+**Error handling:**
+The command provides detailed error messages for common issues:
+- File not found or unreadable
+- Unsupported file format
+- Session not found
+- Installation failures with specific error codes
+- Network connection issues
+
 ## Desktop Controls
 
 Once the desktop window opens, you can use these controls:
@@ -156,6 +223,19 @@ Create `~/.ios-bridge-cli.json`:
 for session in $(ios-bridge list --format json | jq -r '.[].session_id'); do
     ios-bridge stream "$session" &
 done
+
+# Install app on all active sessions
+for session in $(ios-bridge list --format json | jq -r '.[].session_id'); do
+    echo "Installing app on session $session"
+    ios-bridge install-app /path/to/MyApp.ipa "$session" --force --launch
+done
+
+# Automated testing workflow
+SESSION_ID=$(ios-bridge create "iPhone 14 Pro" "16.0" --wait | grep "Session ID:" | awk '{print $3}')
+ios-bridge install-app /path/to/TestApp.ipa "$SESSION_ID" --force --launch
+sleep 5  # Wait for app to fully launch
+ios-bridge screenshot "$SESSION_ID" --output test-result.png
+ios-bridge terminate "$SESSION_ID" --force
 ```
 
 ### Scripting Integration
@@ -164,6 +244,7 @@ done
 #!/usr/bin/env python3
 import subprocess
 import json
+import sys
 
 # Get list of sessions
 result = subprocess.run([
@@ -172,12 +253,26 @@ result = subprocess.run([
 
 sessions = json.loads(result.stdout)
 
-# Stream the first available session
-if sessions:
-    session_id = sessions[0]['session_id']
+if not sessions:
+    print("No sessions available")
+    sys.exit(1)
+
+# Install app on first available session
+session_id = sessions[0]['session_id']
+app_path = "/path/to/MyApp.ipa"
+
+print(f"Installing app on session: {session_id}")
+install_result = subprocess.run([
+    'ios-bridge', 'install-app', app_path, session_id, '--launch', '--force'
+], capture_output=True, text=True)
+
+if install_result.returncode == 0:
+    print("✅ App installed successfully")
+    # Stream the session
     subprocess.run(['ios-bridge', 'stream', session_id])
 else:
-    print("No sessions available")
+    print(f"❌ App installation failed: {install_result.stderr}")
+    sys.exit(1)
 ```
 
 ## Integration Examples

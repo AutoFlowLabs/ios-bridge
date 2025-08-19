@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: ios-bridge-cli
-Version: 1.0.6
+Version: 1.0.9
 Summary: Desktop streaming client for iOS Bridge simulator sessions with Electron app integration
 Home-page: https://github.com/AutoFlowLabs/ios-bridge-cli
 Author: iOS Bridge Team
@@ -33,6 +33,16 @@ Requires-Dist: pillow>=8.0.0
 Requires-Dist: psutil>=5.8.0
 Requires-Dist: aiohttp>=3.8.0
 Requires-Dist: packaging>=21.0
+Requires-Dist: fastapi>=0.100.0
+Requires-Dist: uvicorn>=0.23.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: starlette>=0.27.0
+Requires-Dist: python-multipart>=0.0.6
+Requires-Dist: opencv-python>=4.5.0
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: av>=10.0.0
+Requires-Dist: jinja2>=3.0.0
+Requires-Dist: aiortc>=1.6.0
 Provides-Extra: dev
 Requires-Dist: pytest>=6.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.18.0; extra == "dev"
@@ -41,6 +51,8 @@ Requires-Dist: flake8>=4.0; extra == "dev"
 Requires-Dist: mypy>=0.900; extra == "dev"
 Requires-Dist: build>=0.8.0; extra == "dev"
 Requires-Dist: twine>=4.0.0; extra == "dev"
+Provides-Extra: server
+Requires-Dist: fb-idb>=1.1.0; extra == "server"
 Dynamic: author
 Dynamic: home-page
 Dynamic: license-file
@@ -138,6 +150,27 @@ ios-bridge info <session-id>
 # Terminate session
 ios-bridge terminate <session-id>
 ```
+
+### App Installation
+```bash
+# Install iOS app (.ipa or .zip) on simulator
+ios-bridge install-app /path/to/MyApp.ipa
+
+# Install and launch immediately (shows upload progress)
+ios-bridge install-app /path/to/MyApp.ipa --launch
+
+# Install on specific session (auto-detects if only one session)
+ios-bridge install-app /path/to/MyApp.zip <session-id> --launch
+
+# Skip confirmation prompt with visual progress
+ios-bridge install-app /path/to/MyApp.ipa --force
+```
+
+**Features:**
+- 📊 **Visual Progress Bar**: Real-time upload progress indicator
+- ⚙️ **Installation Status**: Clear feedback during processing
+- 🎯 **File Size Display**: Shows file size before upload
+- 🚀 **Launch Integration**: Automatic app launching after installation
 
 ### Streaming & Control
 ```bash

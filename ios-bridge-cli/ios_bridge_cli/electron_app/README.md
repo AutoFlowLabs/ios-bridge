@@ -75,6 +75,83 @@ For standalone UI testing, the app uses this static `config.json` file:
 - **alwaysOnTop**: Keep window always on top
 - **streaming**: Streaming protocol and quality settings
 
+## App Installation Feature
+
+The desktop app provides a built-in app installation feature that allows you to install iOS apps directly through the desktop interface, without needing to use the CLI.
+
+### Desktop App Installation (GUI Method)
+
+The desktop app includes an **"Import App"** button in the interface that provides a user-friendly way to install apps:
+
+1. **Click "Import App" Button**: Located in the desktop app toolbar
+2. **Select App File**: File dialog opens to browse for your app file
+3. **Choose Installation Options**: 
+   - Install only
+   - Install and launch immediately
+4. **Real-time Progress**: Visual progress bar and status updates
+5. **Success/Error Feedback**: Clear notifications about installation results
+
+### How to Use the Import App Feature
+
+1. **Start the desktop app**:
+   ```bash
+   ios-bridge stream <session-id>
+   ```
+
+2. **Locate the Import App button** in the desktop app interface (usually in the toolbar)
+
+3. **Click "Import App"** and select your app file from the file picker
+
+4. **Choose installation options**:
+   - ✅ **Install Only**: App will be installed but not launched
+   - 🚀 **Install and Launch**: App will be installed and automatically opened
+
+5. **Monitor progress**: Watch the installation progress bar and status messages
+
+### Supported App Formats
+
+- **`.ipa` files**: Standard iOS app archives
+- **`.zip` files**: Containing `.app` bundles for simulators
+
+### Desktop Installation UI Features
+
+- **📁 File Browser**: Native file picker for selecting app files
+- **📊 Progress Bar**: Real-time installation progress
+- **⚙️ Installation Options**: Choose to install only or install & launch
+- **✅ Success Notifications**: Visual confirmation when installation completes
+- **❌ Error Dialogs**: Detailed error messages for troubleshooting
+- **� App Launch**: Automatic app launching if selected
+- **📋 Installation History**: View recently installed apps
+
+### CLI Integration (Alternative Method)
+
+You can also install apps via the command line while the desktop app is running:
+
+```bash
+# Install app on current session
+ios-bridge install-app /path/to/MyApp.ipa
+
+# Install and launch immediately  
+ios-bridge install-app /path/to/MyApp.ipa --launch
+
+# Install on specific session with desktop streaming
+ios-bridge stream <session-id>  # Start desktop app
+ios-bridge install-app /path/to/MyApp.ipa <session-id> --launch
+```
+
+### Complete Workflow Example
+
+```bash
+# Start desktop streaming with app installation capability
+ios-bridge create "iPhone 15 Pro" "17.0" --wait
+SESSION_ID=$(ios-bridge list --format json | jq -r '.[0].session_id')
+ios-bridge stream $SESSION_ID
+
+# Now use either:
+# 1. Desktop GUI: Click "Import App" button in the desktop interface
+# 2. CLI: ios-bridge install-app /path/to/TestApp.ipa $SESSION_ID --launch
+```
+
 ## Building for Distribution
 
 ### Build for current platform
@@ -98,8 +175,11 @@ npm run build-linux  # Linux (AppImage + DEB + RPM)
 - **F5**: Lock Device
 - **F6**: Start Recording
 - **F7**: Stop Recording
+- **F8**: Import App (opens file picker for app installation)
+- **F9**: View Installation History
 - **F11**: Toggle Fullscreen
 - **F12**: Toggle Developer Tools
+- **Cmd/Ctrl+I**: Import App (alternative shortcut)
 - **Cmd/Ctrl+Q**: Quit App
 - **Cmd/Ctrl+R**: Reload
 - **Cmd/Ctrl+Shift+R**: Force Reload
@@ -152,6 +232,15 @@ ios-bridge stream <session-id> --web-only
 - Check that no firewall is blocking localhost connections
 - Ensure an iOS device/simulator is connected and available
 
+**App installation issues**
+- **Import App button not working**: Ensure the desktop app is connected to a valid session
+- **File picker not opening**: Check if the app has proper file system permissions
+- **Installation fails**: Verify the app file (.ipa/.zip) is valid and readable
+- **App not launching after install**: Check if the app is compatible with the iOS version
+- **Progress bar stuck**: Try canceling and retrying the installation
+- **File format errors**: Only .ipa and .zip files are supported
+- **Permission denied**: Ensure the selected file is readable by the app
+
 **Window sizing issues**
 - The app automatically scales to fit your screen
 - Device dimensions are read from the config file
@@ -201,8 +290,18 @@ Override any config.json value from command line:
 3. **Open DevTools:** Press `F12` or `Ctrl+Shift+I`
 4. **Test WebSocket mode:** Default streaming mode
 5. **Test WebRTC mode:** Click "🚀 WebRTC Stream" button
-6. **Make changes:** Files auto-reload on save
-7. **Test production:** `npm run build` then `ios-bridge stream <session-id>`
+6. **Test Import App feature:** 
+   - Click the "Import App" button in the desktop interface
+   - Test file picker functionality
+   - Try installing both .ipa and .zip files
+   - Test both "install only" and "install & launch" options
+7. **Test CLI app installation:** 
+   ```bash
+   # While desktop app is running, install an app via CLI
+   ios-bridge install-app /path/to/TestApp.ipa YOUR_SESSION --launch
+   ```
+8. **Make changes:** Files auto-reload on save
+9. **Test production:** `npm run build` then `ios-bridge stream <session-id>`
 
 ### Documentation
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Comprehensive development guide

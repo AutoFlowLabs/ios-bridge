@@ -795,6 +795,185 @@ def terminate(ctx, session_id: str, force: bool):
         sys.exit(1)
 
 
+@cli.command('install-app')
+@click.argument('app_path', type=click.Path(exists=True, readable=True))
+@click.argument('session_id', required=False)
+@click.option('--launch', '-l',
+              is_flag=True,
+              help='Launch the app immediately after installation')
+@click.option('--force', '-f',
+              is_flag=True,
+              help='Skip confirmation prompts')
+@click.pass_context
+def install_app(ctx, app_path: str, session_id: str, launch: bool, force: bool):
+    """Install an iOS app (.ipa or .zip) on a simulator session
+    
+    APP_PATH: Path to the .ipa or .zip file containing the app
+    SESSION_ID: Target session ID (optional - will auto-detect if only one session exists)
+    
+    Examples:
+      ios-bridge install-app /path/to/MyApp.ipa
+      ios-bridge install-app /path/to/MyApp.zip --launch
+      ios-bridge install-app /path/to/MyApp.ipa abc123 --launch
+    """
+    
+    verbose = ctx.obj['verbose']
+    
+    try:
+        # Auto-detect session ID if not provided
+        session_id = resolve_session_id(ctx, session_id)
+        
+        # Validate app file
+        from pathlib import Path
+        app_file = Path(app_path)
+        
+        if not app_file.exists():
+            click.echo(f"❌ App file not found: {app_path}", err=True)
+            sys.exit(1)
+            
+        if app_file.suffix.lower() not in ['.ipa', '.zip']:
+            click.echo(f"❌ Unsupported file type: {app_file.suffix}", err=True)
+            click.echo("   Supported formats: .ipa (iOS apps), .zip (app bundles)")
+            sys.exit(1)
+        
+        # Get session info
+        session_info = get_client(ctx).get_session_info(session_id)
+        if not session_info:
+            raise SessionNotFoundError(f"Session {session_id} not found")
+        
+        device_name = f"{session_info.get('device_type', 'Unknown')} iOS {session_info.get('ios_version', 'Unknown')}"
+        
+        # Show operation summary
+        click.echo(f"📱 Installing app on iOS simulator:")
+        click.echo(f"   App: {app_file.name} ({app_file.stat().st_size / 1024 / 1024:.1f} MB)")
+        click.echo(f"   Device: {device_name}")
+        click.echo(f"   Session: {session_id[:12]}...")
+        if launch:
+            click.echo(f"   Action: Install and launch")
+        else:
+            click.echo(f"   Action: Install only")
+        
+        # Confirm installation unless forced
+        if not force:
+            action_text = "install and launch" if launch else "install"
+            if not click.confirm(f"\n💡 Do you want to {action_text} {app_file.name}?"):
+                click.echo("🛑 Installation cancelled")
+                return
+        
+        # Perform installation
+        click.echo(f"\n🚀 {'Installing and launching' if launch else 'Installing'} {app_file.name}...")
+        
+        # Show file size for context
+        file_size_mb = app_file.stat().st_size / (1024 * 1024)
+        
+        # Progress tracking with visual indicators
+        upload_started = False
+        
+        def progress_callback(uploaded, total, progress):
+            nonlocal upload_started
+            if not upload_started and uploaded > 0:
+                upload_started = True
+                click.echo(f"📤 Uploading {file_size_mb:.1f} MB...")
+        
+        # Use a spinner for upload progress
+        with click.progressbar(
+            length=100,
+            label=f"📤 Uploading {app_file.name}",
+            show_percent=True,
+            show_pos=False,
+            bar_template='%(label)s  [%(bar)s]  %(info)s'
+        ) as progress_bar:
+            
+            def simple_progress(uploaded, total, progress_pct):
+                # Update progress bar smoothly
+                target_progress = int(progress_pct)
+                current_progress = progress_bar.pos
+                if target_progress > current_progress:
+                    progress_bar.update(target_progress - current_progress)
+            
+            try:
+                result = get_client(ctx).install_app(
+                    session_id, 
+                    str(app_path), 
+                    launch_after_install=launch,
+                    progress_callback=simple_progress if not verbose else None
+                )
+                
+                # Complete the progress bar
+                progress_bar.update(100 - progress_bar.pos)
+                
+            except Exception as e:
+                # Complete the progress bar on error too
+                progress_bar.update(100 - progress_bar.pos)
+                raise
+        
+        # Add some spacing after progress bar
+        click.echo("")
+        
+        # Show installation phase
+        click.echo("⚙️  Processing installation...")
+        
+        if result['success']:
+            click.echo(f"✅ App {'installed and launched' if launch else 'installed'} successfully!")
+            
+            # Show app details if available
+            if result.get('app_info'):
+                app_info = result['app_info']
+                click.echo(f"\n📋 App Details:")
+                click.echo(f"   Name: {app_info.get('name', 'Unknown')}")
+                click.echo(f"   Bundle ID: {app_info.get('bundle_id', 'Unknown')}")
+                if app_info.get('version'):
+                    click.echo(f"   Version: {app_info.get('version')}")
+            
+            if result.get('installed_app'):
+                installed_app = result['installed_app']
+                click.echo(f"   Bundle ID: {installed_app.get('bundle_id', 'Unknown')}")
+            
+            if launch and result.get('launched_app'):
+                launched_app = result['launched_app']
+                click.echo(f"\n🚀 App launched:")
+                click.echo(f"   Bundle ID: {launched_app.get('bundle_id', 'Unknown')}")
+                click.echo(f"   Process ID: {launched_app.get('pid', 'Unknown')}")
+            
+            if result.get('message'):
+                click.echo(f"\n💬 {result['message']}")
+                
+        else:
+            error_msg = result.get('message', 'Unknown error occurred')
+            click.echo(f"❌ Installation failed: {error_msg}", err=True)
+            
+            # Provide helpful error context
+            error_code = result.get('error_code')
+            if error_code == 400:
+                click.echo("   💡 This usually means the app file is corrupted or invalid", err=True)
+            elif error_code == 404:
+                click.echo("   💡 The simulator session was not found or has been terminated", err=True)
+            elif error_code == 500:
+                click.echo("   💡 Server error - check server logs for details", err=True)
+            elif error_code == 'network_error':
+                click.echo("   💡 Check your network connection and server status", err=True)
+            
+            sys.exit(1)
+    
+    except SessionNotFoundError as e:
+        click.echo(f"❌ {e}", err=True)
+        click.echo("💡 Use 'ios-bridge list' to see available sessions")
+        sys.exit(1)
+    except ConnectionError as e:
+        click.echo(f"🔌 Connection error: {e}", err=True)
+        click.echo("💡 Make sure the iOS Bridge server is running")
+        sys.exit(1)
+    except IOSBridgeError as e:
+        click.echo(f"❌ {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        click.echo(f"💥 Unexpected error: {e}", err=True)
+        sys.exit(1)
+
+
 @cli.command()
 @click.option('--port', '-p',
               default=8000,

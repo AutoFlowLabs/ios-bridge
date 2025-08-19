@@ -15,6 +15,7 @@ requirements.txt
 setup.py
 test_package.py
 ios_bridge_cli/__init__.py
+ios_bridge_cli/__main__.py
 ios_bridge_cli/app_manager.py
 ios_bridge_cli/cli.py
 ios_bridge_cli/client.py

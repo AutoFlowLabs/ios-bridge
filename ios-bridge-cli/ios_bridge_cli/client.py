@@ -235,3 +235,113 @@ class IOSBridgeClient:
             if self.verbose:
                 print(f"Error deleting session: {e}")
             return False
+    
+    def install_app(self, session_id: str, app_path: str, launch_after_install: bool = False, progress_callback=None) -> Dict[str, Any]:
+        """Install an app (IPA or ZIP) on a simulator session"""
+        import os
+        from pathlib import Path
+        
+        try:
+            # Validate file exists
+            if not os.path.exists(app_path):
+                raise IOSBridgeError(f"App file not found: {app_path}")
+            
+            file_path = Path(app_path)
+            
+            # Validate file extension
+            if file_path.suffix.lower() not in ['.ipa', '.zip']:
+                raise IOSBridgeError(f"Unsupported file type: {file_path.suffix}. Only .ipa and .zip files are supported.")
+            
+            # Determine field name and endpoint based on file type and launch option
+            if file_path.suffix.lower() == '.ipa':
+                field_name = 'ipa_file'
+            else:
+                field_name = 'app_bundle'
+            
+            endpoint = 'install-and-launch' if launch_after_install else 'install'
+            url = urljoin(self.server_url, f'/api/sessions/{session_id}/apps/{endpoint}')
+            
+            if self.verbose:
+                print(f"Installing {file_path.name} on session {session_id}...")
+                print(f"POST {url}")
+            
+            # Get file size for progress tracking
+            file_size = os.path.getsize(app_path)
+            
+            # Simple progress simulation for upload
+            if progress_callback:
+                import threading
+                import time
+                
+                upload_complete = False
+                
+                def simulate_progress():
+                    # Simulate upload progress
+                    progress_steps = [10, 25, 40, 60, 80, 95]
+                    for step in progress_steps:
+                        if upload_complete:
+                            break
+                        time.sleep(0.3)  # Small delay between steps
+                        progress_callback(int(file_size * step / 100), file_size, step)
+                
+                # Start progress simulation
+                progress_thread = threading.Thread(target=simulate_progress, daemon=True)
+                progress_thread.start()
+            
+            try:
+                # Prepare file upload
+                with open(app_path, 'rb') as f:
+                    files = {field_name: (file_path.name, f, 'application/octet-stream')}
+                    
+                    response = self.session.post(
+                        url,
+                        files=files,
+                        timeout=120  # Longer timeout for file upload
+                    )
+                
+                # Mark upload as complete and finalize progress
+                if progress_callback:
+                    upload_complete = True
+                    progress_callback(file_size, file_size, 100)
+                
+            except Exception as e:
+                if progress_callback:
+                    upload_complete = True
+                raise
+            
+            response.raise_for_status()
+            result = response.json()
+            
+            return {
+                'success': result.get('success', False),
+                'message': result.get('message', ''),
+                'app_info': result.get('app_info'),
+                'installed_app': result.get('installed_app'),
+                'launched_app': result.get('launched_app') if launch_after_install else None
+            }
+            
+        except requests.exceptions.RequestException as e:
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_detail = e.response.text
+                    return {
+                        'success': False,
+                        'message': f"HTTP {e.response.status_code}: {error_detail}",
+                        'error_code': e.response.status_code
+                    }
+                except:
+                    pass
+            
+            return {
+                'success': False,
+                'message': f"Network error: {str(e)}",
+                'error_code': 'network_error'
+            }
+        except IOSBridgeError:
+            raise
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f"Unexpected error: {str(e)}",
+                'error_code': 'unexpected_error'
+            }
