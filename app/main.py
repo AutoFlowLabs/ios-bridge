@@ -4,7 +4,7 @@ import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.api.websockets.log_handler_ws import handle_log_websocket
@@ -182,7 +182,12 @@ async def logs_websocket(websocket: WebSocket, session_id: str):
         logger.error(f"Logs WebSocket error for session {session_id}: {e}")
 
 # HTTP endpoints
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=RedirectResponse)
+async def root():
+    """Redirect root to /web for backward compatibility"""
+    return RedirectResponse(url="/web", status_code=301)
+
+@app.get("/web", response_class=HTMLResponse)
 async def index(request: Request):
     """Main page - session list"""
     return templates.TemplateResponse("session_list.html", {"request": request})

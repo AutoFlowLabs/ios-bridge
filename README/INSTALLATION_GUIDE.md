@@ -180,7 +180,7 @@ ios-bridge stream <session-id>
 **Web Interface:**
 ```bash
 ios-bridge stream <session-id> --web-only
-# Open browser to: http://localhost:8000
+# Open browser to: http://localhost:8000/web
 ```
 
 **Select specific device:**

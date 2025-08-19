@@ -105,7 +105,7 @@ A modern web interface that provides iOS simulator control directly in your brow
 - 🔄 **Stream Modes**: WebSocket and WebRTC options
 
 **Access Points:**
-- **Main Dashboard**: `http://localhost:8000`
+- **Main Dashboard**: `http://localhost:8000/web`
 - **Session Control**: `http://localhost:8000/control/{session-id}`
 - **Direct Web Client**: `http://localhost:8000/web/{session-id}`
 
